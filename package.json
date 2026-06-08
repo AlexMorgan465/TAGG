@@ -1,0 +1,19 @@
+{
+  "name": "pdf-batch-classifier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Batch classify PDFs into TAGGED and UNTAGGED folders using PDF structure trees.",
+  "type": "commonjs",
+  "bin": {
+    "pdf-batch-classifier": "./batch-classify-pdfs.js"
+  },
+  "scripts": {
+    "classify": "node batch-classify-pdfs.js ./input"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.10.38"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
