@@ -5,8 +5,9 @@ Option Explicit
 ' Les six nouveaux champs sont crees a l'ouverture ; les anciens sont masques.
 ' B:G = FECHA, REFERENCIA, CANAL, GODIGO ACTIVIDAD, MOTIVO REASIGNADO, COMMENTAIRE.
 ' A = Collaborateur ; H = Debut ; I = Fin ; J = Duree.
-' Migration de M:R : copie de sauvegarde de la feuille avant conversion.
+' Migration de M:R : sauvegarde du classeur dans un fichier avant conversion.
 
+Private migrationBackupPath As String
 Private currentRow As Long
 Private loading As Boolean
 Private rowMap As Collection
@@ -52,16 +53,44 @@ Private Sub EnsureHeaders(ByVal ws As Worksheet)
     Next i
 End Sub
 
+Private Sub EnsureMigrationBackup()
+    Dim folder As String, baseName As String, extension As String
+    Dim candidate As String, suffix As Long, dot As Long, detail As String
+    If Len(migrationBackupPath) > 0 Then Exit Sub
+    On Error GoTo Failed
+    folder = ThisWorkbook.Path
+    If Len(folder) = 0 Then folder = Application.DefaultFilePath
+    dot = InStrRev(ThisWorkbook.Name, ".")
+    If dot > 0 Then
+        baseName = Left$(ThisWorkbook.Name, dot - 1)
+        extension = Mid$(ThisWorkbook.Name, dot)
+    Else
+        baseName = ThisWorkbook.Name
+        extension = ".xlsm"
+    End If
+    Do
+        suffix = suffix + 1
+        candidate = folder & Application.PathSeparator & baseName & "_avant_B_" & Format$(Now, "yyyymmdd_hhnnss") & "_" & CStr(suffix) & extension
+    Loop While Len(Dir$(candidate)) > 0
+    ThisWorkbook.SaveCopyAs candidate
+    If Len(Dir$(candidate)) = 0 Then Err.Raise vbObjectError + 708, , "Le fichier de sauvegarde est introuvable."
+    migrationBackupPath = candidate
+    Exit Sub
+Failed:
+    detail = Err.Description
+    Err.Raise vbObjectError + 709, "EnsureMigrationBackup", "Sauvegarde impossible dans " & folder & ". La migration n'a pas commence. Detail : " & detail
+End Sub
+
 Private Sub PrepareSheet(ByVal ws As Worksheet)
     Dim oldLayout As Boolean, h As Variant, i As Long, r As Long, n As Long
-    Dim source As Variant, migrated() As Variant, backup As Worksheet
-    Dim backupName As String, suffix As Long, exists As Boolean, candidate As Worksheet
+    Dim source As Variant, migrated() As Variant
     h = Headers()
     oldLayout = True
     For i = 0 To 5
         If StrComp(CStr(ws.Cells(1, 13 + i).Value), h(i), vbTextCompare) <> 0 Then oldLayout = False
     Next i
     If oldLayout Then
+        If ws.ProtectContents Then Err.Raise vbObjectError + 710, , "La feuille " & ws.Name & " est protegee en ecriture. Aucune conversion effectuee."
         n = ws.UsedRange.Row + ws.UsedRange.Rows.Count - 1
         If n < 2 Then n = 2
         source = ws.Range("A1:R" & n).Value2
@@ -88,18 +117,9 @@ Private Sub PrepareSheet(ByVal ws As Worksheet)
                 Err.Raise vbObjectError + 707, , "Ligne d'un ancien format dans " & ws.Name & ". Conversion automatique arretee pour conserver ses donnees."
             End If
         Next r
-        Do
-            suffix = suffix + 1
-            backupName = Left$(ws.Name, 16) & "_avant_B_" & CStr(suffix)
-            exists = False
-            For Each candidate In ThisWorkbook.Worksheets
-                If candidate.Name = backupName Then exists = True
-            Next candidate
-        Loop While exists
-        ws.Copy After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
-        Set backup = ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
-        backup.Name = backupName
-        ' Une copie complete existe avant le remplacement des colonnes.
+        ' SaveCopyAs ne duplique aucune feuille et ne change pas la structure.
+        ' Si la sauvegarde echoue, l'erreur interrompt la migration AVANT effacement.
+        EnsureMigrationBackup
         ws.Range("A1:R" & n).ClearContents
         ws.Columns(3).NumberFormat = "@"
         ws.Columns(7).NumberFormat = "@"
