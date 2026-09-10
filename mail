@@ -1,27 +1,513 @@
-Eliminar
-Transferir
-Tratar
-Contestar
-OCI
-Ningun contrato
-ETA
-AMPLI WEB
-Otros
-Incidencia técnica
-****************+
-MONIA
-MALEK
-AZIZ
-SALMA
-DONIA
-FAYCEL
-AMEN ALLAH
-AMENI
-FATMA
-TAKOUA
-KARIMA
-MONSERRAT
-VERONICA
-AZIZA
-IMED
-RAHMA
+Option Explicit
+
+' Remplacer tout le code de UserForm1 par ce fichier.
+' Garder les controles existants dans le concepteur : leurs boutons sont reutilises.
+' Les six nouveaux champs sont crees a l'ouverture ; les anciens sont masques.
+' M:R = FECHA, REFERENCIA, CANAL, GODIGO ACTIVIDAD, MOTIVO REASIGNADO, COMMENTAIRE.
+' Les colonnes historiques restent a leur place dans les quatre feuilles.
+
+Private currentRow As Long
+Private loading As Boolean
+Private rowMap As Collection
+Private txtFechaNuevo As MSForms.TextBox
+Private txtReferenciaNuevo As MSForms.TextBox
+Private cmbCanalNuevo As MSForms.ComboBox
+Private cmbActividadNuevo As MSForms.ComboBox
+Private cmbMotivoNuevo As MSForms.ComboBox
+Private txtCommentaireNuevo As MSForms.TextBox
+Private Const FIRST_NEW As Long = 13
+
+Private Function GetTempSheet() As Worksheet
+    Set GetTempSheet = ThisWorkbook.Worksheets("temp")
+End Function
+
+Private Function GetExtractSheet() As Worksheet
+    Set GetExtractSheet = ThisWorkbook.Worksheets("extraction")
+End Function
+
+Private Function LastRow(ByVal ws As Worksheet) As Long
+    LastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+End Function
+
+Private Function Headers() As Variant
+    Headers = Array("FECHA", "REFERENCIA", "CANAL", "GODIGO ACTIVIDAD", "MOTIVO REASIGNADO", "COMMENTAIRE")
+End Function
+
+Private Sub EnsureHeaders(ByVal ws As Worksheet)
+    Dim h As Variant, i As Long
+    h = Headers()
+    For i = 0 To 5
+        If Len(CStr(ws.Cells(1, FIRST_NEW + i).Value)) > 0 Then
+            If CStr(ws.Cells(1, FIRST_NEW + i).Value) <> h(i) Then
+                Err.Raise vbObjectError + 701, , "Les colonnes M:R de " & ws.Name & " sont deja utilisees."
+            End If
+        ElseIf Application.CountA(ws.Columns(FIRST_NEW + i)) > 0 Then
+            Err.Raise vbObjectError + 702, , "La colonne " & CStr(FIRST_NEW + i) & " de " & ws.Name & " contient deja des donnees."
+        End If
+    Next i
+    For i = 0 To 5
+        ws.Cells(1, FIRST_NEW + i).Value = h(i)
+    Next i
+End Sub
+
+Private Sub HideOldFields(ByVal container As Object)
+    Dim ctl As Object
+    For Each ctl In container.Controls
+        If TypeName(ctl) <> "CommandButton" Then ctl.Visible = False
+    Next ctl
+End Sub
+
+Private Sub NewLabel(ByVal container As Object, ByVal name As String, ByVal caption As String, ByVal x As Single, ByVal y As Single, ByVal w As Single)
+    Dim ctl As MSForms.Label
+    Set ctl = container.Controls.Add("Forms.Label.1", name, True)
+    ctl.Caption = caption
+    ctl.Left = x
+    ctl.Top = y
+    ctl.Width = w
+    ctl.Height = 12
+    ctl.Font.Name = "Tahoma"
+    ctl.Font.Size = 8
+    ctl.BackStyle = fmBackStyleTransparent
+End Sub
+
+Private Sub PositionField(ByVal ctl As Object, ByVal x As Single, ByVal y As Single, ByVal w As Single)
+    ctl.Left = x
+    ctl.Top = y
+    ctl.Width = w
+    ctl.Height = 18
+    ctl.Font.Name = "Tahoma"
+    ctl.Font.Size = 8
+End Sub
+
+Private Sub SetChoices(ByVal ctl As MSForms.ComboBox, ByVal items As Variant)
+    Dim item As Variant
+    ctl.Clear
+    ctl.Style = fmStyleDropDownList
+    ctl.ListRows = 10
+    For Each item In items
+        ctl.AddItem CStr(item)
+    Next item
+    ctl.ListIndex = -1
+End Sub
+
+Private Sub HideRemovedControls(ByVal container As Object)
+    Dim ctl As Object, caption As String
+    For Each ctl In container.Controls
+        Select Case LCase$(ctl.Name)
+            Case "cmbtraitement", "optbo", "optfo", "commandbutton1"
+                ctl.Visible = False
+                ctl.Enabled = False
+        End Select
+        If TypeName(ctl) = "Label" Then
+            caption = LCase$(Replace(Replace(CStr(ctl.Caption), " ", ""), "-", ""))
+            If InStr(caption, "traitement") > 0 Or InStr(caption, "backoffice") > 0 Or InStr(caption, "frontoffice") > 0 Then ctl.Visible = False
+        ElseIf TypeName(ctl) = "Frame" Then
+            HideRemovedControls ctl
+        End If
+    Next ctl
+End Sub
+
+Private Sub BuildFields()
+    Dim step1 As Object, step2 As Object, w As Single
+    Set step1 = txtDossier.Parent
+    Set step2 = cmbSignature.Parent
+    If TypeName(step1) <> "Frame" Or TypeName(step2) <> "Frame" Then
+        Err.Raise vbObjectError + 703, , "txtDossier et cmbSignature doivent etre dans les cadres Etape 1 et Etape 2."
+    End If
+    If step1 Is step2 Then Err.Raise vbObjectError + 704, , "Les deux etapes doivent avoir des cadres distincts."
+    HideOldFields step1
+    HideOldFields step2
+    step1.Caption = "Etape 1"
+    step2.Caption = "Etape 2"
+    HideRemovedControls Me
+
+    w = step1.Width - 90
+    NewLabel step1, "lblFechaNuevo", "FECHA", 8, 14, 72
+    NewLabel step1, "lblReferenciaNuevo", "REFERENCIA", 8, 35, 72
+    NewLabel step1, "lblCanalNuevo", "CANAL", 8, 56, 72
+    Set txtFechaNuevo = step1.Controls.Add("Forms.TextBox.1", "txtFechaNuevo", True)
+    Set txtReferenciaNuevo = step1.Controls.Add("Forms.TextBox.1", "txtReferenciaNuevo", True)
+    Set cmbCanalNuevo = step1.Controls.Add("Forms.ComboBox.1", "cmbCanalNuevo", True)
+    PositionField txtFechaNuevo, 80, 11, w
+    PositionField txtReferenciaNuevo, 80, 32, w
+    PositionField cmbCanalNuevo, 80, 53, w
+    txtFechaNuevo.Locked = True
+    txtFechaNuevo.TabStop = False
+    txtReferenciaNuevo.TabIndex = 0
+    cmbCanalNuevo.TabIndex = 1
+    cmbCanalNuevo.ListWidth = 150
+    cmb_Ajouter.Top = 76
+    If step1.Height < 101 Then step1.Height = 101
+    If step2.Top < step1.Top + step1.Height + 6 Then step2.Top = step1.Top + step1.Height + 6
+
+    NewLabel step2, "lblActividadNuevo", "GODIGO ACTIVIDAD", 8, 12, step2.Width - 16
+    NewLabel step2, "lblMotivoNuevo", "MOTIVO REASIGNADO", 8, 53, step2.Width - 16
+    Set cmbActividadNuevo = step2.Controls.Add("Forms.ComboBox.1", "cmbActividadNuevo", True)
+    Set cmbMotivoNuevo = step2.Controls.Add("Forms.ComboBox.1", "cmbMotivoNuevo", True)
+    PositionField cmbActividadNuevo, 8, 27, step2.Width - 20
+    PositionField cmbMotivoNuevo, 8, 68, step2.Width - 20
+    cmbActividadNuevo.TabIndex = 0
+    cmbMotivoNuevo.TabIndex = 1
+    NewLabel step2, "lblCommentaireNuevo", "COMMENTAIRE (facultatif)", 8, 94, step2.Width - 16
+    Set txtCommentaireNuevo = step2.Controls.Add("Forms.TextBox.1", "txtCommentaireNuevo", True)
+    PositionField txtCommentaireNuevo, 8, 109, step2.Width - 20
+    txtCommentaireNuevo.Height = 44
+    txtCommentaireNuevo.MultiLine = True
+    txtCommentaireNuevo.EnterKeyBehavior = True
+    txtCommentaireNuevo.WordWrap = True
+    txtCommentaireNuevo.ScrollBars = fmScrollBarsVertical
+    txtCommentaireNuevo.MaxLength = 32767
+    txtCommentaireNuevo.TabIndex = 2
+    If cmb_Terminer.Top < 161 Then cmb_Terminer.Top = 161
+    If step2.Height < cmb_Terminer.Top + cmb_Terminer.Height + 8 Then step2.Height = cmb_Terminer.Top + cmb_Terminer.Height + 8
+
+    If step2.Top + step2.Height + 12 > Me.InsideHeight Then
+        Me.ScrollBars = fmScrollBarsVertical
+        Me.ScrollHeight = step2.Top + step2.Height + 12
+    End If
+
+    SetChoices cmbCanalNuevo, Array("DOCUMENT DEFAULT", "ESTUDIO CLIENTE", "WMAIL DIRECTO", "ESA", "AMPLI DISPO")
+    SetChoices cmbActividadNuevo, Array("Actu_dni", "WCLI_BANK", "Wci_Lab", "Otros.")
+    SetChoices cmbMotivoNuevo, Array("Eliminar", "Transferir", "Tratar", "Contestar", "OCI", "Ningun contrato", "ETA", "AMPLI WEB", "Otros", "Incidencia t" & ChrW(233) & "cnica")
+    recherche_Type.Caption = "Recherche Motif"
+    recherche_Cred.Caption = "Recherche Canal"
+    recherche_Sign.Caption = "Recherche Activite"
+End Sub
+
+Private Sub UserForm_Initialize()
+    On Error GoTo Failed
+    loading = True
+    BuildFields
+    agent.Value = "Bonjour " & Application.UserName
+    clearform
+    loading = False
+    RefreshListView
+    StartClock
+    Exit Sub
+Failed:
+    loading = False
+    cmb_Ajouter.Enabled = False
+    cmb_Terminer.Enabled = False
+    MsgBox "Initialisation impossible : " & Err.Description, vbExclamation
+End Sub
+
+Private Sub UserForm_Terminate()
+    StopClock
+End Sub
+
+Private Sub UserForm_Activate()
+    Me.StartUpPosition = 0
+    Me.Left = Application.Left + (Application.Width - Me.Width) / 2
+    Me.Top = Application.Top + (Application.Height - Me.Height) / 2
+End Sub
+
+Sub clearform()
+    currentRow = 0
+    txtFechaNuevo.Value = Format$(Date, "dd/mm/yyyy")
+    txtReferenciaNuevo.Value = ""
+    cmbCanalNuevo.ListIndex = -1
+    cmbActividadNuevo.ListIndex = -1
+    cmbMotivoNuevo.ListIndex = -1
+    txtCommentaireNuevo.Value = ""
+End Sub
+
+Private Sub RefreshListView(Optional ByVal filterCol As Long = 0, Optional ByVal query As String = "")
+    Dim ws As Worksheet, r As Long, j As Long, idx As Long, h As Variant
+    loading = True
+    currentRow = 0
+    Set ws = GetTempSheet()
+    Set rowMap = New Collection
+    vue.RowSource = ""
+    vue.Clear
+    vue.ColumnCount = 7
+    vue.ColumnHeads = False
+    vue.ColumnWidths = "75;100;135;100;135;150;75"
+    h = Headers()
+    vue.AddItem h(0)
+    For j = 1 To 5
+        vue.List(0, j) = h(j)
+    Next j
+    vue.List(0, 6) = "ETAT"
+    rowMap.Add 0
+    For r = 2 To LastRow(ws)
+        If IsDate(ws.Cells(r, 13).Value) Then
+            If filterCol = 0 Then
+                idx = 1
+            Else
+                idx = InStr(1, CStr(ws.Cells(r, filterCol).Value), query, vbTextCompare)
+            End If
+            If idx > 0 Then
+                vue.AddItem Format$(ws.Cells(r, 13).Value, "dd/mm/yyyy")
+                For j = 1 To 5
+                    vue.List(vue.ListCount - 1, j) = CStr(ws.Cells(r, 13 + j).Value)
+                Next j
+                If Len(CStr(ws.Cells(r, 4).Value)) = 0 Then
+                    vue.List(vue.ListCount - 1, 6) = "En attente"
+                Else
+                    vue.List(vue.ListCount - 1, 6) = "Termine"
+                End If
+                rowMap.Add r
+            End If
+        End If
+    Next r
+    loading = False
+End Sub
+
+Private Sub WriteStart(ByVal ws As Worksheet, ByVal r As Long, ByVal started As Date)
+    Dim refCol As Long
+    refCol = 7
+    ws.Cells(r, 1).Value = Environ$("USERNAME")
+    ws.Cells(r, 3).Value = started
+    ws.Cells(r, refCol).NumberFormat = "@"
+    ws.Cells(r, refCol).Value = Trim$(txtReferenciaNuevo.Value)
+    ws.Cells(r, 13).Value = DateValue(started)
+    ws.Cells(r, 13).NumberFormat = "dd/mm/yyyy"
+    ws.Cells(r, 14).NumberFormat = "@"
+    ws.Cells(r, 14).Value = Trim$(txtReferenciaNuevo.Value)
+    ws.Cells(r, 15).Value = cmbCanalNuevo.Value
+End Sub
+
+Private Sub cmb_Ajouter_Click()
+    Dim ws As Worksheet, wx As Worksheet, r As Long, tr As Long, er As Long, started As Date
+    Dim writing As Boolean, detail As String
+    On Error GoTo Failed
+    If Len(Trim$(txtReferenciaNuevo.Value)) = 0 Or cmbCanalNuevo.ListIndex < 0 Then
+        MsgBox "Veuillez remplir REFERENCIA et CANAL.", vbExclamation
+        Exit Sub
+    End If
+    Set ws = GetTempSheet()
+    Set wx = GetExtractSheet()
+    EnsureHeaders ws
+    EnsureHeaders wx
+    For r = 2 To LastRow(ws)
+        If IsDate(ws.Cells(r, 13).Value) Then
+            If Len(CStr(ws.Cells(r, 4).Value)) = 0 Then
+                MsgBox "Terminez le dossier en attente avant d'en ajouter un nouveau.", vbExclamation
+                Exit Sub
+            End If
+            If StrComp(CStr(ws.Cells(r, 14).Value), Trim$(txtReferenciaNuevo.Value), vbTextCompare) = 0 Then
+                MsgBox "Cette reference existe deja.", vbExclamation
+                Exit Sub
+            End If
+        End If
+    Next r
+    tr = LastRow(ws) + 1
+    er = LastRow(wx) + 1
+    started = Now
+    writing = True
+    WriteStart ws, tr, started
+    WriteStart wx, er, started
+    writing = False
+    RefreshListView
+    For r = 1 To rowMap.Count
+        If CLng(rowMap(r)) = tr Then
+            vue.ListIndex = r - 1
+            Exit For
+        End If
+    Next r
+    LoadSelectedData
+    MsgBox "Dossier ajoute. Completez maintenant l'Etape 2.", vbInformation
+    Exit Sub
+Failed:
+    detail = Err.Description
+    If writing Then
+        On Error Resume Next
+        ws.Range(ws.Cells(tr, 1), ws.Cells(tr, 18)).ClearContents
+        wx.Range(wx.Cells(er, 1), wx.Cells(er, 18)).ClearContents
+        On Error GoTo 0
+    End If
+    MsgBox "Ajout impossible : " & detail, vbExclamation
+End Sub
+
+Private Sub vue_Click()
+    If Not loading Then LoadSelectedData
+End Sub
+
+Sub LoadSelectedData()
+    Dim ws As Worksheet
+    currentRow = 0
+    If rowMap Is Nothing Then Exit Sub
+    If vue.ListIndex <= 0 Then Exit Sub
+    Set ws = GetTempSheet()
+    currentRow = CLng(rowMap(vue.ListIndex + 1))
+    txtFechaNuevo.Value = Format$(ws.Cells(currentRow, 13).Value, "dd/mm/yyyy")
+    txtReferenciaNuevo.Value = CStr(ws.Cells(currentRow, 14).Value)
+    cmbCanalNuevo.Value = CStr(ws.Cells(currentRow, 15).Value)
+    cmbActividadNuevo.Value = CStr(ws.Cells(currentRow, 16).Value)
+    cmbMotivoNuevo.Value = CStr(ws.Cells(currentRow, 17).Value)
+    txtCommentaireNuevo.Value = CStr(ws.Cells(currentRow, 18).Value)
+End Sub
+
+Private Sub cmb_Terminer_Click()
+    Dim ws As Worksheet, wx As Worksheet, r As Long, target As Long, finished As Date
+    Dim oldTemp As Variant, oldExtract As Variant, writing As Boolean, detail As String
+    On Error GoTo Failed
+    If currentRow < 2 Then
+        MsgBox "Selectionnez d'abord un dossier dans la liste.", vbExclamation
+        Exit Sub
+    End If
+    If cmbActividadNuevo.ListIndex < 0 Or cmbMotivoNuevo.ListIndex < 0 Then
+        MsgBox "Veuillez remplir GODIGO ACTIVIDAD et MOTIVO REASIGNADO.", vbExclamation
+        Exit Sub
+    End If
+    Set ws = GetTempSheet()
+    Set wx = GetExtractSheet()
+    EnsureHeaders ws
+    EnsureHeaders wx
+    If txtReferenciaNuevo.Value <> CStr(ws.Cells(currentRow, 14).Value) Or cmbCanalNuevo.Value <> CStr(ws.Cells(currentRow, 15).Value) Then
+        MsgBox "L'Etape 1 est deja enregistree. Reselectionnez le dossier pour retrouver ses valeurs.", vbExclamation
+        Exit Sub
+    End If
+    For r = 2 To LastRow(wx)
+        If CStr(wx.Cells(r, 14).Value) = CStr(ws.Cells(currentRow, 14).Value) Then
+            If wx.Cells(r, 3).Value2 = ws.Cells(currentRow, 3).Value2 And CStr(wx.Cells(r, 1).Value) = CStr(ws.Cells(currentRow, 1).Value) Then
+                target = r
+                Exit For
+            End If
+        End If
+    Next r
+    If target = 0 Then
+        MsgBox "La ligne correspondante est absente de l'extraction. Le dossier n'a pas ete modifie.", vbExclamation
+        Exit Sub
+    End If
+    oldTemp = ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 18)).Formula
+    oldExtract = wx.Range(wx.Cells(target, 1), wx.Cells(target, 18)).Formula
+    finished = Now
+    If IsDate(ws.Cells(currentRow, 4).Value) Then finished = CDate(ws.Cells(currentRow, 4).Value)
+    writing = True
+    WriteFinish ws, currentRow, finished
+    WriteFinish wx, target, finished
+    writing = False
+    clearform
+    RefreshListView
+    MsgBox "Etape 2 enregistree.", vbInformation
+    Exit Sub
+Failed:
+    detail = Err.Description
+    If writing Then
+        On Error Resume Next
+        ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 18)).Formula = oldTemp
+        wx.Range(wx.Cells(target, 1), wx.Cells(target, 18)).Formula = oldExtract
+        On Error GoTo 0
+    End If
+    MsgBox "Enregistrement impossible : " & detail, vbExclamation
+End Sub
+
+Private Sub WriteFinish(ByVal ws As Worksheet, ByVal r As Long, ByVal finished As Date)
+    Dim durationCol As Long
+    durationCol = 11
+    ws.Cells(r, 4).Value = finished
+    ws.Cells(r, durationCol).Value = finished - CDate(ws.Cells(r, 3).Value)
+    ws.Cells(r, durationCol).NumberFormat = "[h]:mm:ss"
+    ws.Cells(r, 16).Value = cmbActividadNuevo.Value
+    ws.Cells(r, 17).Value = cmbMotivoNuevo.Value
+    ws.Cells(r, 18).NumberFormat = "@"
+    ws.Cells(r, 18).Value = txtCommentaireNuevo.Value
+End Sub
+
+Private Sub SearchColumn(ByVal col As Long, ByVal caption As String)
+    Dim query As String
+    query = InputBox("Rechercher : " & caption, "Recherche")
+    clearform
+    If Len(query) = 0 Then
+        RefreshListView
+    Else
+        RefreshListView col, query
+    End If
+End Sub
+
+Private Sub recherche_Ref_Click()
+    SearchData_REF
+End Sub
+Sub SearchData_REF()
+    SearchColumn 14, "REFERENCIA"
+End Sub
+Private Sub recherche_Cred_Click()
+    SearchData_Cred
+End Sub
+Sub SearchData_Cred()
+    SearchColumn 15, "CANAL"
+End Sub
+Private Sub recherche_Sign_Click()
+    SearchData_Sign
+End Sub
+Sub SearchData_Sign()
+    SearchColumn 16, "GODIGO ACTIVIDAD"
+End Sub
+Private Sub recherche_Type_Click()
+    SearchData_Type
+End Sub
+Sub SearchData_Type()
+    SearchColumn 17, "MOTIVO REASIGNADO"
+End Sub
+
+Private Sub cmb_vider_Click()
+    Dim ws As Worksheet, r As Long
+    Set ws = GetTempSheet()
+    If MsgBox("Vider les nouveaux dossiers termines de la liste ? Les extractions sont conservees.", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
+    For r = LastRow(ws) To 2 Step -1
+        If IsDate(ws.Cells(r, 13).Value) And IsDate(ws.Cells(r, 4).Value) Then
+            ws.Range(ws.Cells(r, 1), ws.Cells(r, 18)).ClearContents
+        End If
+    Next r
+    clearform
+    RefreshListView
+End Sub
+
+' Export des nouveaux dossiers de l'extraction vers un fichier choisi.
+' Les anciennes donnees et les lignes d'extraction ne sont pas effacees.
+Private Function CsvValue(ByVal value As String) As String
+    CsvValue = """" & Replace(value, """", """""") & """"
+End Function
+
+Private Sub cmb_Sauvegarder_Click()
+    Dim path As Variant, ws As Worksheet, sheetName As Variant, r As Long, j As Long
+    Dim content As String, line As String, h As Variant, count As Long, stream As Object
+    On Error GoTo Failed
+    h = Headers()
+    content = "Collaborateur;Date debut;Date fin;" & Join(h, ";") & vbCrLf
+    For Each sheetName In Array("extraction")
+        Set ws = ThisWorkbook.Worksheets(CStr(sheetName))
+        For r = 2 To LastRow(ws)
+            If IsDate(ws.Cells(r, 13).Value) Then
+                line = CsvValue(CStr(ws.Cells(r, 1).Value))
+                For j = 3 To 4
+                    If IsDate(ws.Cells(r, j).Value) Then
+                        line = line & ";" & CsvValue(Format$(ws.Cells(r, j).Value, "yyyy-mm-dd hh:nn:ss"))
+                    Else
+                        line = line & ";" & CsvValue("")
+                    End If
+                Next j
+                line = line & ";" & CsvValue(Format$(ws.Cells(r, 13).Value, "dd/mm/yyyy"))
+                For j = 14 To 18
+                    line = line & ";" & CsvValue(CStr(ws.Cells(r, j).Value))
+                Next j
+                content = content & line & vbCrLf
+                count = count + 1
+            End If
+        Next r
+    Next sheetName
+    If count = 0 Then
+        MsgBox "Aucun nouveau dossier a exporter.", vbInformation
+        Exit Sub
+    End If
+    path = Application.GetSaveAsFilename(InitialFileName:="Cofidis_" & Format$(Now, "yyyymmdd_hhnnss") & ".csv", FileFilter:="CSV (*.csv),*.csv")
+    If VarType(path) = vbBoolean Then Exit Sub
+    If LCase$(Right$(CStr(path), 4)) <> ".csv" Then path = CStr(path) & ".csv"
+    If Len(Dir$(CStr(path))) > 0 Then
+        If MsgBox("Remplacer ce fichier CSV ?", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
+    End If
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText content
+    stream.SaveToFile CStr(path), 2
+    stream.Close
+    MsgBox CStr(count) & " dossier(s) exporte(s). Les donnees du classeur sont conservees.", vbInformation
+    Exit Sub
+Failed:
+    MsgBox "Export impossible : " & Err.Description, vbExclamation
+    On Error Resume Next
+    If Not stream Is Nothing Then stream.Close
+End Sub
