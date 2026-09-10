@@ -3,8 +3,9 @@ Option Explicit
 ' Remplacer tout le code de UserForm1 par ce fichier.
 ' Garder les controles existants dans le concepteur : leurs boutons sont reutilises.
 ' Les six nouveaux champs sont crees a l'ouverture ; les anciens sont masques.
-' M:R = FECHA, REFERENCIA, CANAL, GODIGO ACTIVIDAD, MOTIVO REASIGNADO, COMMENTAIRE.
-' Les colonnes historiques restent a leur place dans les quatre feuilles.
+' B:G = FECHA, REFERENCIA, CANAL, GODIGO ACTIVIDAD, MOTIVO REASIGNADO, COMMENTAIRE.
+' A = Collaborateur ; H = Debut ; I = Fin ; J = Duree.
+' Migration de M:R : copie de sauvegarde de la feuille avant conversion.
 
 Private currentRow As Long
 Private loading As Boolean
@@ -15,7 +16,7 @@ Private cmbCanalNuevo As MSForms.ComboBox
 Private cmbActividadNuevo As MSForms.ComboBox
 Private cmbMotivoNuevo As MSForms.ComboBox
 Private txtCommentaireNuevo As MSForms.TextBox
-Private Const FIRST_NEW As Long = 13
+Private Const FIRST_NEW As Long = 2
 
 Private Function GetTempSheet() As Worksheet
     Set GetTempSheet = ThisWorkbook.Worksheets("temp")
@@ -34,20 +35,92 @@ Private Function Headers() As Variant
 End Function
 
 Private Sub EnsureHeaders(ByVal ws As Worksheet)
-    Dim h As Variant, i As Long
-    h = Headers()
-    For i = 0 To 5
-        If Len(CStr(ws.Cells(1, FIRST_NEW + i).Value)) > 0 Then
-            If CStr(ws.Cells(1, FIRST_NEW + i).Value) <> h(i) Then
-                Err.Raise vbObjectError + 701, , "Les colonnes M:R de " & ws.Name & " sont deja utilisees."
+    Dim h As Variant, i As Long, expected As String
+    h = Array("Collaborateur", "FECHA", "REFERENCIA", "CANAL", "GODIGO ACTIVIDAD", "MOTIVO REASIGNADO", "COMMENTAIRE", "DEBUT", "FIN", "DUREE")
+    For i = 0 To 9
+        expected = CStr(ws.Cells(1, i + 1).Value)
+        If Len(expected) > 0 Then
+            If StrComp(expected, h(i), vbTextCompare) <> 0 Then
+                Err.Raise vbObjectError + 701, , "Entete incompatible dans " & ws.Name & ", colonne " & CStr(i + 1) & ". Aucune donnee n'a ete ecrasee."
             End If
-        ElseIf Application.CountA(ws.Columns(FIRST_NEW + i)) > 0 Then
-            Err.Raise vbObjectError + 702, , "La colonne " & CStr(FIRST_NEW + i) & " de " & ws.Name & " contient deja des donnees."
+        ElseIf Application.CountA(ws.Columns(i + 1)) > 0 Then
+            Err.Raise vbObjectError + 702, , "Colonne sans entete contenant des donnees dans " & ws.Name & "."
         End If
     Next i
-    For i = 0 To 5
-        ws.Cells(1, FIRST_NEW + i).Value = h(i)
+    For i = 0 To 9
+        ws.Cells(1, i + 1).Value = h(i)
     Next i
+End Sub
+
+Private Sub PrepareSheet(ByVal ws As Worksheet)
+    Dim oldLayout As Boolean, h As Variant, i As Long, r As Long, n As Long
+    Dim source As Variant, migrated() As Variant, backup As Worksheet
+    Dim backupName As String, suffix As Long, exists As Boolean, candidate As Worksheet
+    h = Headers()
+    oldLayout = True
+    For i = 0 To 5
+        If StrComp(CStr(ws.Cells(1, 13 + i).Value), h(i), vbTextCompare) <> 0 Then oldLayout = False
+    Next i
+    If oldLayout Then
+        n = ws.UsedRange.Row + ws.UsedRange.Rows.Count - 1
+        If n < 2 Then n = 2
+        source = ws.Range("A1:R" & n).Value2
+        ReDim migrated(1 To n, 1 To 10)
+        migrated(1, 1) = "Collaborateur"
+        For i = 0 To 5
+            migrated(1, 2 + i) = h(i)
+        Next i
+        migrated(1, 8) = "DEBUT"
+        migrated(1, 9) = "FIN"
+        migrated(1, 10) = "DUREE"
+        For r = 2 To n
+            If Len(CStr(source(r, 13))) > 0 Then
+                If Not IsDate(ws.Cells(r, 13).Value) Then Err.Raise vbObjectError + 705, , "Date invalide en M" & r & " dans " & ws.Name
+                If Len(CStr(source(r, 2))) > 0 Then Err.Raise vbObjectError + 706, , "Anciennes et nouvelles donnees melangees dans " & ws.Name & ". Conversion automatique arretee."
+                migrated(r, 1) = source(r, 1)
+                For i = 0 To 5
+                    migrated(r, 2 + i) = source(r, 13 + i)
+                Next i
+                migrated(r, 8) = source(r, 3)
+                migrated(r, 9) = source(r, 4)
+                migrated(r, 10) = source(r, 11)
+            ElseIf Application.CountA(ws.Range(ws.Cells(r, 1), ws.Cells(r, 18))) > 0 Then
+                Err.Raise vbObjectError + 707, , "Ligne d'un ancien format dans " & ws.Name & ". Conversion automatique arretee pour conserver ses donnees."
+            End If
+        Next r
+        Do
+            suffix = suffix + 1
+            backupName = Left$(ws.Name, 16) & "_avant_B_" & CStr(suffix)
+            exists = False
+            For Each candidate In ThisWorkbook.Worksheets
+                If candidate.Name = backupName Then exists = True
+            Next candidate
+        Loop While exists
+        ws.Copy After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+        Set backup = ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+        backup.Name = backupName
+        ' Une copie complete existe avant le remplacement des colonnes.
+        ws.Range("A1:R" & n).ClearContents
+        ws.Columns(3).NumberFormat = "@"
+        ws.Columns(7).NumberFormat = "@"
+        ws.Range("A1:J" & n).Value2 = migrated
+    End If
+    EnsureHeaders ws
+    ws.Columns(2).NumberFormat = "dd/mm/yyyy"
+    ws.Columns(3).NumberFormat = "@"
+    ws.Columns(7).NumberFormat = "@"
+    ws.Range("H:I").NumberFormat = "dd/mm/yyyy hh:mm:ss"
+    ws.Columns(10).NumberFormat = "[h]:mm:ss"
+    ws.Range("A1:J1").Font.Bold = True
+    ws.Columns(1).ColumnWidth = 24
+    ws.Columns(2).ColumnWidth = 12
+    ws.Columns(3).ColumnWidth = 20
+    ws.Columns(4).ColumnWidth = 24
+    ws.Columns(5).ColumnWidth = 22
+    ws.Columns(6).ColumnWidth = 26
+    ws.Columns(7).ColumnWidth = 36
+    ws.Range("H:I").ColumnWidth = 21
+    ws.Columns(10).ColumnWidth = 12
 End Sub
 
 Private Sub HideOldFields(ByVal container As Object)
@@ -136,9 +209,16 @@ Private Sub BuildFields()
     txtReferenciaNuevo.TabIndex = 0
     cmbCanalNuevo.TabIndex = 1
     cmbCanalNuevo.ListWidth = 150
-    cmb_Ajouter.Top = 76
-    If step1.Height < 101 Then step1.Height = 101
-    If step2.Top < step1.Top + step1.Height + 6 Then step2.Top = step1.Top + step1.Height + 6
+    If cmb_Ajouter.Parent Is step1 Then
+        cmb_Ajouter.Top = 76
+    Else
+        cmb_Ajouter.Top = step1.Top + 76
+    End If
+    cmb_Ajouter.Height = 22
+    step1.Height = 104
+    step1.ScrollBars = fmScrollBarsNone
+    step1.ScrollTop = 0
+    step2.Top = step1.Top + step1.Height + 6
 
     NewLabel step2, "lblActividadNuevo", "GODIGO ACTIVIDAD", 8, 12, step2.Width - 16
     NewLabel step2, "lblMotivoNuevo", "MOTIVO REASIGNADO", 8, 53, step2.Width - 16
@@ -158,13 +238,17 @@ Private Sub BuildFields()
     txtCommentaireNuevo.ScrollBars = fmScrollBarsVertical
     txtCommentaireNuevo.MaxLength = 32767
     txtCommentaireNuevo.TabIndex = 2
-    If cmb_Terminer.Top < 161 Then cmb_Terminer.Top = 161
-    If step2.Height < cmb_Terminer.Top + cmb_Terminer.Height + 8 Then step2.Height = cmb_Terminer.Top + cmb_Terminer.Height + 8
-
-    If step2.Top + step2.Height + 12 > Me.InsideHeight Then
-        Me.ScrollBars = fmScrollBarsVertical
-        Me.ScrollHeight = step2.Top + step2.Height + 12
+    If cmb_Terminer.Parent Is step2 Then
+        cmb_Terminer.Top = 161
+    Else
+        cmb_Terminer.Top = step2.Top + 161
     End If
+    cmb_Terminer.Height = 22
+    cmb_Terminer.Visible = True
+    step2.Height = 191
+    step2.ScrollBars = fmScrollBarsNone
+    step2.ScrollTop = 0
+    CompactLayout step1, step2
 
     SetChoices cmbCanalNuevo, Array("DOCUMENT DEFAULT", "ESTUDIO CLIENTE", "WMAIL DIRECTO", "ESA", "AMPLI DISPO")
     SetChoices cmbActividadNuevo, Array("Actu_dni", "WCLI_BANK", "Wci_Lab", "Otros.")
@@ -174,10 +258,47 @@ Private Sub BuildFields()
     recherche_Sign.Caption = "Recherche Activite"
 End Sub
 
+Private Sub CompactLayout(ByVal step1 As Object, ByVal step2 As Object)
+    Dim ctl As Object, bottom As Single, buttonTop As Single
+    ' Les cadres et la liste ont une hauteur exacte, pas un minimum.
+    ' Les anciens controles masques ne determinent plus la hauteur.
+    For Each ctl In step2.Controls
+        If TypeName(ctl) = "CommandButton" Then
+            ctl.Top = 161
+            ctl.Height = 22
+            ctl.Visible = True
+        End If
+    Next ctl
+    bottom = step2.Top + step2.Height
+    vue.Height = bottom - vue.Top
+    ' Boutons de pied de formulaire, dont Sauvegarder.
+    buttonTop = bottom + 6
+    For Each ctl In Me.Controls
+        If TypeName(ctl) = "CommandButton" Then
+            If ctl.Visible And ctl.Top >= bottom Then
+                ctl.Top = buttonTop
+                ctl.Height = 22
+            End If
+        End If
+    Next ctl
+    bottom = buttonTop + 30
+    Me.ScrollTop = 0
+    Me.Height = bottom + (Me.Height - Me.InsideHeight)
+    If Me.Height > Application.UsableHeight Then Me.Height = Application.UsableHeight
+    Me.ScrollHeight = bottom
+    If bottom > Me.InsideHeight Then
+        Me.ScrollBars = fmScrollBarsVertical
+    Else
+        Me.ScrollBars = fmScrollBarsNone
+    End If
+End Sub
+
 Private Sub UserForm_Initialize()
     On Error GoTo Failed
     loading = True
     BuildFields
+    PrepareSheet GetTempSheet()
+    PrepareSheet GetExtractSheet()
     agent.Value = "Bonjour " & Application.UserName
     clearform
     loading = False
@@ -230,18 +351,18 @@ Private Sub RefreshListView(Optional ByVal filterCol As Long = 0, Optional ByVal
     vue.List(0, 6) = "ETAT"
     rowMap.Add 0
     For r = 2 To LastRow(ws)
-        If IsDate(ws.Cells(r, 13).Value) Then
+        If IsDate(ws.Cells(r, 2).Value) Then
             If filterCol = 0 Then
                 idx = 1
             Else
                 idx = InStr(1, CStr(ws.Cells(r, filterCol).Value), query, vbTextCompare)
             End If
             If idx > 0 Then
-                vue.AddItem Format$(ws.Cells(r, 13).Value, "dd/mm/yyyy")
+                vue.AddItem Format$(ws.Cells(r, 2).Value, "dd/mm/yyyy")
                 For j = 1 To 5
-                    vue.List(vue.ListCount - 1, j) = CStr(ws.Cells(r, 13 + j).Value)
+                    vue.List(vue.ListCount - 1, j) = CStr(ws.Cells(r, 2 + j).Value)
                 Next j
-                If Len(CStr(ws.Cells(r, 4).Value)) = 0 Then
+                If Len(CStr(ws.Cells(r, 9).Value)) = 0 Then
                     vue.List(vue.ListCount - 1, 6) = "En attente"
                 Else
                     vue.List(vue.ListCount - 1, 6) = "Termine"
@@ -254,17 +375,13 @@ Private Sub RefreshListView(Optional ByVal filterCol As Long = 0, Optional ByVal
 End Sub
 
 Private Sub WriteStart(ByVal ws As Worksheet, ByVal r As Long, ByVal started As Date)
-    Dim refCol As Long
-    refCol = 7
     ws.Cells(r, 1).Value = Environ$("USERNAME")
-    ws.Cells(r, 3).Value = started
-    ws.Cells(r, refCol).NumberFormat = "@"
-    ws.Cells(r, refCol).Value = Trim$(txtReferenciaNuevo.Value)
-    ws.Cells(r, 13).Value = DateValue(started)
-    ws.Cells(r, 13).NumberFormat = "dd/mm/yyyy"
-    ws.Cells(r, 14).NumberFormat = "@"
-    ws.Cells(r, 14).Value = Trim$(txtReferenciaNuevo.Value)
-    ws.Cells(r, 15).Value = cmbCanalNuevo.Value
+    ws.Cells(r, 8).Value = started
+    ws.Cells(r, 2).Value = DateValue(started)
+    ws.Cells(r, 2).NumberFormat = "dd/mm/yyyy"
+    ws.Cells(r, 3).NumberFormat = "@"
+    ws.Cells(r, 3).Value = Trim$(txtReferenciaNuevo.Value)
+    ws.Cells(r, 4).Value = cmbCanalNuevo.Value
 End Sub
 
 Private Sub cmb_Ajouter_Click()
@@ -280,12 +397,12 @@ Private Sub cmb_Ajouter_Click()
     EnsureHeaders ws
     EnsureHeaders wx
     For r = 2 To LastRow(ws)
-        If IsDate(ws.Cells(r, 13).Value) Then
-            If Len(CStr(ws.Cells(r, 4).Value)) = 0 Then
+        If IsDate(ws.Cells(r, 2).Value) Then
+            If Len(CStr(ws.Cells(r, 9).Value)) = 0 Then
                 MsgBox "Terminez le dossier en attente avant d'en ajouter un nouveau.", vbExclamation
                 Exit Sub
             End If
-            If StrComp(CStr(ws.Cells(r, 14).Value), Trim$(txtReferenciaNuevo.Value), vbTextCompare) = 0 Then
+            If StrComp(CStr(ws.Cells(r, 3).Value), Trim$(txtReferenciaNuevo.Value), vbTextCompare) = 0 Then
                 MsgBox "Cette reference existe deja.", vbExclamation
                 Exit Sub
             End If
@@ -312,8 +429,8 @@ Failed:
     detail = Err.Description
     If writing Then
         On Error Resume Next
-        ws.Range(ws.Cells(tr, 1), ws.Cells(tr, 18)).ClearContents
-        wx.Range(wx.Cells(er, 1), wx.Cells(er, 18)).ClearContents
+        ws.Range(ws.Cells(tr, 1), ws.Cells(tr, 10)).ClearContents
+        wx.Range(wx.Cells(er, 1), wx.Cells(er, 10)).ClearContents
         On Error GoTo 0
     End If
     MsgBox "Ajout impossible : " & detail, vbExclamation
@@ -330,12 +447,12 @@ Sub LoadSelectedData()
     If vue.ListIndex <= 0 Then Exit Sub
     Set ws = GetTempSheet()
     currentRow = CLng(rowMap(vue.ListIndex + 1))
-    txtFechaNuevo.Value = Format$(ws.Cells(currentRow, 13).Value, "dd/mm/yyyy")
-    txtReferenciaNuevo.Value = CStr(ws.Cells(currentRow, 14).Value)
-    cmbCanalNuevo.Value = CStr(ws.Cells(currentRow, 15).Value)
-    cmbActividadNuevo.Value = CStr(ws.Cells(currentRow, 16).Value)
-    cmbMotivoNuevo.Value = CStr(ws.Cells(currentRow, 17).Value)
-    txtCommentaireNuevo.Value = CStr(ws.Cells(currentRow, 18).Value)
+    txtFechaNuevo.Value = Format$(ws.Cells(currentRow, 2).Value, "dd/mm/yyyy")
+    txtReferenciaNuevo.Value = CStr(ws.Cells(currentRow, 3).Value)
+    cmbCanalNuevo.Value = CStr(ws.Cells(currentRow, 4).Value)
+    cmbActividadNuevo.Value = CStr(ws.Cells(currentRow, 5).Value)
+    cmbMotivoNuevo.Value = CStr(ws.Cells(currentRow, 6).Value)
+    txtCommentaireNuevo.Value = CStr(ws.Cells(currentRow, 7).Value)
 End Sub
 
 Private Sub cmb_Terminer_Click()
@@ -354,13 +471,13 @@ Private Sub cmb_Terminer_Click()
     Set wx = GetExtractSheet()
     EnsureHeaders ws
     EnsureHeaders wx
-    If txtReferenciaNuevo.Value <> CStr(ws.Cells(currentRow, 14).Value) Or cmbCanalNuevo.Value <> CStr(ws.Cells(currentRow, 15).Value) Then
+    If txtReferenciaNuevo.Value <> CStr(ws.Cells(currentRow, 3).Value) Or cmbCanalNuevo.Value <> CStr(ws.Cells(currentRow, 4).Value) Then
         MsgBox "L'Etape 1 est deja enregistree. Reselectionnez le dossier pour retrouver ses valeurs.", vbExclamation
         Exit Sub
     End If
     For r = 2 To LastRow(wx)
-        If CStr(wx.Cells(r, 14).Value) = CStr(ws.Cells(currentRow, 14).Value) Then
-            If wx.Cells(r, 3).Value2 = ws.Cells(currentRow, 3).Value2 And CStr(wx.Cells(r, 1).Value) = CStr(ws.Cells(currentRow, 1).Value) Then
+        If CStr(wx.Cells(r, 3).Value) = CStr(ws.Cells(currentRow, 3).Value) Then
+            If wx.Cells(r, 8).Value2 = ws.Cells(currentRow, 8).Value2 And CStr(wx.Cells(r, 1).Value) = CStr(ws.Cells(currentRow, 1).Value) Then
                 target = r
                 Exit For
             End If
@@ -370,10 +487,10 @@ Private Sub cmb_Terminer_Click()
         MsgBox "La ligne correspondante est absente de l'extraction. Le dossier n'a pas ete modifie.", vbExclamation
         Exit Sub
     End If
-    oldTemp = ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 18)).Formula
-    oldExtract = wx.Range(wx.Cells(target, 1), wx.Cells(target, 18)).Formula
+    oldTemp = ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 10)).Formula
+    oldExtract = wx.Range(wx.Cells(target, 1), wx.Cells(target, 10)).Formula
     finished = Now
-    If IsDate(ws.Cells(currentRow, 4).Value) Then finished = CDate(ws.Cells(currentRow, 4).Value)
+    If IsDate(ws.Cells(currentRow, 9).Value) Then finished = CDate(ws.Cells(currentRow, 9).Value)
     writing = True
     WriteFinish ws, currentRow, finished
     WriteFinish wx, target, finished
@@ -386,8 +503,8 @@ Failed:
     detail = Err.Description
     If writing Then
         On Error Resume Next
-        ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 18)).Formula = oldTemp
-        wx.Range(wx.Cells(target, 1), wx.Cells(target, 18)).Formula = oldExtract
+        ws.Range(ws.Cells(currentRow, 1), ws.Cells(currentRow, 10)).Formula = oldTemp
+        wx.Range(wx.Cells(target, 1), wx.Cells(target, 10)).Formula = oldExtract
         On Error GoTo 0
     End If
     MsgBox "Enregistrement impossible : " & detail, vbExclamation
@@ -395,14 +512,14 @@ End Sub
 
 Private Sub WriteFinish(ByVal ws As Worksheet, ByVal r As Long, ByVal finished As Date)
     Dim durationCol As Long
-    durationCol = 11
-    ws.Cells(r, 4).Value = finished
-    ws.Cells(r, durationCol).Value = finished - CDate(ws.Cells(r, 3).Value)
+    durationCol = 10
+    ws.Cells(r, 9).Value = finished
+    ws.Cells(r, durationCol).Value = finished - CDate(ws.Cells(r, 8).Value)
     ws.Cells(r, durationCol).NumberFormat = "[h]:mm:ss"
-    ws.Cells(r, 16).Value = cmbActividadNuevo.Value
-    ws.Cells(r, 17).Value = cmbMotivoNuevo.Value
-    ws.Cells(r, 18).NumberFormat = "@"
-    ws.Cells(r, 18).Value = txtCommentaireNuevo.Value
+    ws.Cells(r, 5).Value = cmbActividadNuevo.Value
+    ws.Cells(r, 6).Value = cmbMotivoNuevo.Value
+    ws.Cells(r, 7).NumberFormat = "@"
+    ws.Cells(r, 7).Value = txtCommentaireNuevo.Value
 End Sub
 
 Private Sub SearchColumn(ByVal col As Long, ByVal caption As String)
@@ -420,25 +537,25 @@ Private Sub recherche_Ref_Click()
     SearchData_REF
 End Sub
 Sub SearchData_REF()
-    SearchColumn 14, "REFERENCIA"
+    SearchColumn 3, "REFERENCIA"
 End Sub
 Private Sub recherche_Cred_Click()
     SearchData_Cred
 End Sub
 Sub SearchData_Cred()
-    SearchColumn 15, "CANAL"
+    SearchColumn 4, "CANAL"
 End Sub
 Private Sub recherche_Sign_Click()
     SearchData_Sign
 End Sub
 Sub SearchData_Sign()
-    SearchColumn 16, "GODIGO ACTIVIDAD"
+    SearchColumn 5, "GODIGO ACTIVIDAD"
 End Sub
 Private Sub recherche_Type_Click()
     SearchData_Type
 End Sub
 Sub SearchData_Type()
-    SearchColumn 17, "MOTIVO REASIGNADO"
+    SearchColumn 6, "MOTIVO REASIGNADO"
 End Sub
 
 Private Sub cmb_vider_Click()
@@ -446,8 +563,8 @@ Private Sub cmb_vider_Click()
     Set ws = GetTempSheet()
     If MsgBox("Vider les nouveaux dossiers termines de la liste ? Les extractions sont conservees.", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
     For r = LastRow(ws) To 2 Step -1
-        If IsDate(ws.Cells(r, 13).Value) And IsDate(ws.Cells(r, 4).Value) Then
-            ws.Range(ws.Cells(r, 1), ws.Cells(r, 18)).ClearContents
+        If IsDate(ws.Cells(r, 2).Value) And IsDate(ws.Cells(r, 9).Value) Then
+            ws.Range(ws.Cells(r, 1), ws.Cells(r, 10)).ClearContents
         End If
     Next r
     clearform
@@ -465,22 +582,22 @@ Private Sub cmb_Sauvegarder_Click()
     Dim content As String, line As String, h As Variant, count As Long, stream As Object
     On Error GoTo Failed
     h = Headers()
-    content = "Collaborateur;Date debut;Date fin;" & Join(h, ";") & vbCrLf
+    content = "Collaborateur;" & Join(h, ";") & ";DEBUT;FIN" & vbCrLf
     For Each sheetName In Array("extraction")
         Set ws = ThisWorkbook.Worksheets(CStr(sheetName))
         For r = 2 To LastRow(ws)
-            If IsDate(ws.Cells(r, 13).Value) Then
+            If IsDate(ws.Cells(r, 2).Value) Then
                 line = CsvValue(CStr(ws.Cells(r, 1).Value))
-                For j = 3 To 4
+                line = line & ";" & CsvValue(Format$(ws.Cells(r, 2).Value, "dd/mm/yyyy"))
+                For j = 3 To 7
+                    line = line & ";" & CsvValue(CStr(ws.Cells(r, j).Value))
+                Next j
+                For j = 8 To 9
                     If IsDate(ws.Cells(r, j).Value) Then
                         line = line & ";" & CsvValue(Format$(ws.Cells(r, j).Value, "yyyy-mm-dd hh:nn:ss"))
                     Else
                         line = line & ";" & CsvValue("")
                     End If
-                Next j
-                line = line & ";" & CsvValue(Format$(ws.Cells(r, 13).Value, "dd/mm/yyyy"))
-                For j = 14 To 18
-                    line = line & ";" & CsvValue(CStr(ws.Cells(r, j).Value))
                 Next j
                 content = content & line & vbCrLf
                 count = count + 1
