@@ -597,72 +597,95 @@ Sub SearchData_Type()
 End Sub
 
 Private Sub cmb_vider_Click()
-    Dim ws As Worksheet, r As Long
-    Set ws = GetTempSheet()
-    If MsgBox("Vider les nouveaux dossiers termines de la liste ? Les extractions sont conservees.", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
-    For r = LastRow(ws) To 2 Step -1
-        If IsDate(ws.Cells(r, 2).Value) And IsDate(ws.Cells(r, 9).Value) Then
-            ws.Range(ws.Cells(r, 1), ws.Cells(r, 10)).ClearContents
-        End If
-    Next r
+    Dim ws As Worksheet
+    On Error GoTo Failed
+    Set ws = ThisWorkbook.Worksheets("temp")
+    ' Toutes les lignes, y compris les dossiers en attente ; garder les entetes.
+    ws.Rows("2:" & ws.Rows.Count).ClearContents
     clearform
     RefreshListView
+    MsgBox "La feuille temp a ete videe. Les entetes sont conserves.", vbInformation
+    Exit Sub
+Failed:
+    MsgBox "Vidage impossible : " & Err.Description, vbExclamation
 End Sub
 
-' Export des nouveaux dossiers de l'extraction vers un fichier choisi.
-' Les anciennes donnees et les lignes d'extraction ne sont pas effacees.
 Private Function CsvValue(ByVal value As String) As String
     CsvValue = """" & Replace(value, """", """""") & """"
 End Function
 
+Private Function ExportCell(ByVal cell As Range) As String
+    Dim value As Variant, seconds As Double, hours As Double
+    value = cell.Value2
+    If IsError(value) Then
+        ExportCell = cell.Text
+    ElseIf IsEmpty(value) Then
+        ExportCell = ""
+    ElseIf cell.Row = 1 Then
+        ExportCell = CStr(value)
+    ElseIf (cell.Column = 2 Or cell.Column = 8 Or cell.Column = 9) And IsDate(cell.Value) Then
+        If cell.Column = 2 Then
+            ExportCell = Format$(cell.Value, "dd/mm/yyyy")
+        Else
+            ExportCell = Format$(cell.Value, "yyyy-mm-dd hh:nn:ss")
+        End If
+    ElseIf cell.Column = 10 And IsNumeric(value) And VarType(value) <> vbString Then
+        seconds = Round(CDbl(value) * 86400, 0)
+        hours = Fix(Abs(seconds) / 3600)
+        ExportCell = IIf(seconds < 0, "-", "") & Format$(hours, "0") & ":" & Format$(Fix(Abs(seconds) / 60) - hours * 60, "00") & ":" & Format$(Abs(seconds) - Fix(Abs(seconds) / 60) * 60, "00")
+    Else
+        ExportCell = CStr(value)
+    End If
+End Function
+
 Private Sub cmb_Sauvegarder_Click()
-    Dim path As Variant, ws As Worksheet, sheetName As Variant, r As Long, j As Long
-    Dim content As String, line As String, h As Variant, count As Long, stream As Object
+    Const EXPORT_FOLDER As String = "\\chemine\amine"
+    Dim ws As Worksheet, lastCell As Range, lastDataRow As Long, lastCol As Long
+    Dim r As Long, col As Long, line As String, stream As Object, fso As Object
+    Dim path As String, stem As String, suffix As Long, detail As String
     On Error GoTo Failed
-    h = Headers()
-    content = "Collaborateur;" & Join(h, ";") & ";DEBUT;FIN" & vbCrLf
-    For Each sheetName In Array("extraction")
-        Set ws = ThisWorkbook.Worksheets(CStr(sheetName))
-        For r = 2 To LastRow(ws)
-            If IsDate(ws.Cells(r, 2).Value) Then
-                line = CsvValue(CStr(ws.Cells(r, 1).Value))
-                line = line & ";" & CsvValue(Format$(ws.Cells(r, 2).Value, "dd/mm/yyyy"))
-                For j = 3 To 7
-                    line = line & ";" & CsvValue(CStr(ws.Cells(r, j).Value))
-                Next j
-                For j = 8 To 9
-                    If IsDate(ws.Cells(r, j).Value) Then
-                        line = line & ";" & CsvValue(Format$(ws.Cells(r, j).Value, "yyyy-mm-dd hh:nn:ss"))
-                    Else
-                        line = line & ";" & CsvValue("")
-                    End If
-                Next j
-                content = content & line & vbCrLf
-                count = count + 1
-            End If
-        Next r
-    Next sheetName
-    If count = 0 Then
-        MsgBox "Aucun nouveau dossier a exporter.", vbInformation
+    Set ws = ThisWorkbook.Worksheets("extraction")
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious, MatchCase:=False, SearchFormat:=False)
+    If lastCell Is Nothing Then
+        MsgBox "La feuille extraction est vide.", vbInformation
         Exit Sub
     End If
-    path = Application.GetSaveAsFilename(InitialFileName:="Cofidis_" & Format$(Now, "yyyymmdd_hhnnss") & ".csv", FileFilter:="CSV (*.csv),*.csv")
-    If VarType(path) = vbBoolean Then Exit Sub
-    If LCase$(Right$(CStr(path), 4)) <> ".csv" Then path = CStr(path) & ".csv"
-    If Len(Dir$(CStr(path))) > 0 Then
-        If MsgBox("Remplacer ce fichier CSV ?", vbYesNo + vbQuestion) <> vbYes Then Exit Sub
+    lastDataRow = lastCell.Row
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious, MatchCase:=False, SearchFormat:=False)
+    lastCol = lastCell.Column
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FolderExists(EXPORT_FOLDER) Then
+        Err.Raise vbObjectError + 711, , "Dossier reseau inaccessible : " & EXPORT_FOLDER
     End If
+    stem = EXPORT_FOLDER & "\Cofidis_extraction_" & Format$(Now, "yyyymmdd_hhnnss")
+    path = stem & ".csv"
+    Do While fso.FileExists(path)
+        suffix = suffix + 1
+        path = stem & "_" & CStr(suffix) & ".csv"
+    Loop
     Set stream = CreateObject("ADODB.Stream")
     stream.Type = 2
     stream.Charset = "utf-8"
     stream.Open
-    stream.WriteText content
-    stream.SaveToFile CStr(path), 2
+    ' Toutes les colonnes et toutes les lignes, meme filtrees ou en attente.
+    ' Les en-tetes sont ceux de la feuille ; la duree est incluse.
+    For r = 1 To lastDataRow
+        line = ""
+        For col = 1 To lastCol
+            If col > 1 Then line = line & ";"
+            line = line & CsvValue(ExportCell(ws.Cells(r, col)))
+        Next col
+        stream.WriteText line & vbCrLf
+    Next r
+    ' 1 = creer uniquement : ne jamais remplacer un export existant.
+    stream.SaveToFile path, 1
     stream.Close
-    MsgBox CStr(count) & " dossier(s) exporte(s). Les donnees du classeur sont conservees.", vbInformation
+    MsgBox "Export termine : " & path, vbInformation
     Exit Sub
 Failed:
-    MsgBox "Export impossible : " & Err.Description, vbExclamation
+    detail = Err.Description
     On Error Resume Next
     If Not stream Is Nothing Then stream.Close
+    On Error GoTo 0
+    MsgBox "Export impossible : " & detail & vbCrLf & "Les donnees d'extraction sont conservees.", vbExclamation
 End Sub
