@@ -1,34 +1,3 @@
-Sub SeparerExtensions()
-
-    Dim ws As Worksheet
-    Dim derniereLigne As Long
-    Dim i As Long
-    Dim nomFichier As String
-    Dim positionPoint As Long
-
-    Set ws = ActiveSheet
-
-    ' Dernière ligne de la colonne A
-    derniereLigne = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-
-    ' Titre de la nouvelle colonne
-    ws.Range("B1").Value = "Extension"
-
-    For i = 2 To derniereLigne
-
-        nomFichier = Trim(ws.Cells(i, "A").Value)
-
-        ' Cherche le dernier point dans le nom
-        positionPoint = InStrRev(nomFichier, ".")
-
-        If positionPoint > 0 Then
-            ws.Cells(i, "B").Value = Mid(nomFichier, positionPoint + 1)
-        Else
-            ws.Cells(i, "B").Value = ""
-        End If
-
-    Next i
-
-    MsgBox "Extensions séparées avec succès !", vbInformation
-
-End Sub
+Bonjour Isabelle,
+Suite à notre échange, tu trouveras ci-joint la liste extraite des fiches traitées pour l’entité CMMABN, avec un total de 45 fiches. Ce résultat correspond bien aux données présentes dans l’extrait du fichier de statistiques mensuelles.
+J’ai également actualisé le fichier « Pilotage_accessibilité » disponible dans le DP.
