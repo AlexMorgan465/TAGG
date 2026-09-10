@@ -638,54 +638,139 @@ Private Function ExportCell(ByVal cell As Range) As String
     End If
 End Function
 
+Private Function CsvRecords(ByVal content As String) As Collection
+    Dim result As New Collection, quoted As Boolean, i As Long, start As Long, ch As String
+    start = 1
+    i = 1
+    Do While i <= Len(content)
+        ch = Mid$(content, i, 1)
+        If ch = """" Then quoted = Not quoted
+        If Not quoted And (ch = vbCr Or ch = vbLf) Then
+            result.Add Mid$(content, start, i - start)
+            If ch = vbCr And Mid$(content, i + 1, 1) = vbLf Then i = i + 1
+            start = i + 1
+        End If
+        i = i + 1
+    Loop
+    If quoted Then Err.Raise vbObjectError + 712, , "Le CSV existant est incomplet (guillemets non fermes)."
+    If start <= Len(content) Then result.Add Mid$(content, start)
+    Set CsvRecords = result
+End Function
+
+Private Function CsvSheetRow(ByVal ws As Worksheet, ByVal r As Long, ByVal lastCol As Long) As String
+    Dim col As Long, line As String
+    For col = 1 To lastCol
+        If col > 1 Then line = line & ";"
+        line = line & CsvValue(ExportCell(ws.Cells(r, col)))
+    Next col
+    CsvSheetRow = line
+End Function
+
 Private Sub cmb_Sauvegarder_Click()
     Const EXPORT_FOLDER As String = "\\chemine\amine"
     Dim ws As Worksheet, lastCell As Range, lastDataRow As Long, lastCol As Long
-    Dim r As Long, col As Long, line As String, stream As Object, fso As Object
-    Dim path As String, stem As String, suffix As Long, detail As String
+    Dim r As Long, line As String, header As String, stream As Object, fso As Object
+    Dim path As String, session As String, detail As String, content As String, added As String
+    Dim fileNum As Integer, opened As Boolean, originalSize As Long, bytes() As Byte
+    Dim records As Collection, counts As Object, item As Variant, n As Long
     On Error GoTo Failed
     Set ws = ThisWorkbook.Worksheets("extraction")
     Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious, MatchCase:=False, SearchFormat:=False)
-    If lastCell Is Nothing Then
-        MsgBox "La feuille extraction est vide.", vbInformation
+    If lastCell Is Nothing Then Exit Sub
+    lastDataRow = lastCell.Row
+    If lastDataRow < 2 Then
+        MsgBox "Aucune donnee a exporter.", vbInformation
         Exit Sub
     End If
-    lastDataRow = lastCell.Row
     Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious, MatchCase:=False, SearchFormat:=False)
     lastCol = lastCell.Column
+    session = Environ$("USERNAME")
+    If Len(session) = 0 Then Err.Raise vbObjectError + 713, , "Nom de session Windows introuvable."
+    For Each item In Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+        session = Replace(session, CStr(item), "_")
+    Next item
     Set fso = CreateObject("Scripting.FileSystemObject")
-    If Not fso.FolderExists(EXPORT_FOLDER) Then
-        Err.Raise vbObjectError + 711, , "Dossier reseau inaccessible : " & EXPORT_FOLDER
+    If Not fso.FolderExists(EXPORT_FOLDER) Then Err.Raise vbObjectError + 711, , "Dossier reseau inaccessible : " & EXPORT_FOLDER
+    path = EXPORT_FOLDER & "\" & session & "_" & Format$(Date, "yyyy-mm-dd") & ".csv"
+    header = CsvSheetRow(ws, 1, lastCol)
+    ' Verrou exclusif : deux sauvegardes ne peuvent pas ecrire simultanement.
+    fileNum = FreeFile
+    Open path For Binary Access Read Write Lock Read Write As #fileNum
+    opened = True
+    originalSize = LOF(fileNum)
+    Set counts = CreateObject("Scripting.Dictionary")
+    counts.CompareMode = vbBinaryCompare
+    If originalSize > 0 Then
+        ReDim bytes(0 To originalSize - 1)
+        Get #fileNum, 1, bytes
+        Set stream = CreateObject("ADODB.Stream")
+        stream.Type = 1
+        stream.Open
+        stream.Write bytes
+        stream.Position = 0
+        stream.Type = 2
+        stream.Charset = "utf-8"
+        content = stream.ReadText
+        stream.Close
+        If Left$(content, 1) = ChrW(&HFEFF) Then content = Mid$(content, 2)
+        Set records = CsvRecords(content)
+        If records.Count = 0 Then Err.Raise vbObjectError + 714, , "CSV existant sans entete."
+        If CStr(records(1)) <> header Then Err.Raise vbObjectError + 715, , "Les colonnes du CSV du jour sont differentes. Le fichier n'a pas ete modifie."
+        For r = 2 To records.Count
+            line = CStr(records(r))
+            If counts.Exists(line) Then
+                counts(line) = CLng(counts(line)) + 1
+            Else
+                counts.Add line, 1
+            End If
+        Next r
     End If
-    stem = EXPORT_FOLDER & "\Cofidis_extraction_" & Format$(Now, "yyyymmdd_hhnnss")
-    path = stem & ".csv"
-    Do While fso.FileExists(path)
-        suffix = suffix + 1
-        path = stem & "_" & CStr(suffix) & ".csv"
-    Loop
-    Set stream = CreateObject("ADODB.Stream")
-    stream.Type = 2
-    stream.Charset = "utf-8"
-    stream.Open
-    ' Toutes les colonnes et toutes les lignes, meme filtrees ou en attente.
-    ' Les en-tetes sont ceux de la feuille ; la duree est incluse.
-    For r = 1 To lastDataRow
-        line = ""
-        For col = 1 To lastCol
-            If col > 1 Then line = line & ";"
-            line = line & CsvValue(ExportCell(ws.Cells(r, col)))
-        Next col
-        stream.WriteText line & vbCrLf
+    ' Comparer les lignes completes, y compris commentaires avec retours a la ligne.
+    ' Conserver aussi plusieurs occurrences identiques presentes dans extraction.
+    For r = 2 To lastDataRow
+        If Application.CountA(ws.Range(ws.Cells(r, 1), ws.Cells(r, lastCol))) > 0 Then
+            line = CsvSheetRow(ws, r, lastCol)
+            If counts.Exists(line) Then
+                If CLng(counts(line)) > 0 Then
+                    counts(line) = CLng(counts(line)) - 1
+                Else
+                    added = added & line & vbCrLf
+                    n = n + 1
+                End If
+            Else
+                added = added & line & vbCrLf
+                n = n + 1
+            End If
+        End If
     Next r
-    ' 1 = creer uniquement : ne jamais remplacer un export existant.
-    stream.SaveToFile path, 1
-    stream.Close
-    MsgBox "Export termine : " & path, vbInformation
+    If n > 0 Then
+        If originalSize = 0 Then
+            added = header & vbCrLf & added
+        ElseIf Right$(content, 1) <> vbLf And Right$(content, 1) <> vbCr Then
+            added = vbCrLf & added
+        End If
+        Set stream = CreateObject("ADODB.Stream")
+        stream.Type = 2
+        stream.Charset = "utf-8"
+        stream.Open
+        stream.WriteText added
+        stream.Position = 0
+        stream.Type = 1
+        ' Garder le BOM UTF-8 uniquement lors de la creation du fichier.
+        If originalSize > 0 Then stream.Position = 3
+        bytes = stream.Read
+        Put #fileNum, originalSize + 1, bytes
+        stream.Close
+    End If
+    Close #fileNum
+    opened = False
+    MsgBox CStr(n) & " nouvelle(s) ligne(s) ajoutee(s) : " & path, vbInformation
     Exit Sub
 Failed:
     detail = Err.Description
     On Error Resume Next
     If Not stream Is Nothing Then stream.Close
+    If opened Then Close #fileNum
     On Error GoTo 0
     MsgBox "Export impossible : " & detail & vbCrLf & "Les donnees d'extraction sont conservees.", vbExclamation
 End Sub
