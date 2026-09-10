@@ -8,6 +8,7 @@ Option Explicit
 ' Migration de M:R : sauvegarde du classeur dans un fichier avant conversion.
 
 Private migrationBackupPath As String
+Private WithEvents btnTerminerNuevo As MSForms.CommandButton
 Private currentRow As Long
 Private loading As Boolean
 Private rowMap As Collection
@@ -258,13 +259,26 @@ Private Sub BuildFields()
     txtCommentaireNuevo.ScrollBars = fmScrollBarsVertical
     txtCommentaireNuevo.MaxLength = 32767
     txtCommentaireNuevo.TabIndex = 2
-    If cmb_Terminer.Parent Is step2 Then
-        cmb_Terminer.Top = 161
-    Else
-        cmb_Terminer.Top = step2.Top + 161
-    End If
-    cmb_Terminer.Height = 22
-    cmb_Terminer.Visible = True
+    ' Le bouton est cree dans le meme cadre que le commentaire.
+    ' Sa position ne depend donc plus du parent de l'ancien bouton.
+    cmb_Terminer.Visible = False
+    Set btnTerminerNuevo = step2.Controls.Add("Forms.CommandButton.1", "btnTerminerNuevo", True)
+    With btnTerminerNuevo
+        .Caption = "Terminer"
+        .Left = step2.Width - 104
+        .Top = txtCommentaireNuevo.Top + txtCommentaireNuevo.Height + 8
+        .Width = 92
+        .Height = 24
+        .Font.Name = "Tahoma"
+        .Font.Size = 10
+        .Font.Bold = True
+        .BackColor = RGB(0, 176, 80)
+        .ForeColor = RGB(255, 255, 255)
+        .Enabled = True
+        .Visible = True
+        .TabStop = True
+        .TabIndex = 3
+    End With
     step2.Height = 191
     step2.ScrollBars = fmScrollBarsNone
     step2.ScrollTop = 0
@@ -282,13 +296,11 @@ Private Sub CompactLayout(ByVal step1 As Object, ByVal step2 As Object)
     Dim ctl As Object, bottom As Single, buttonTop As Single
     ' Les cadres et la liste ont une hauteur exacte, pas un minimum.
     ' Les anciens controles masques ne determinent plus la hauteur.
-    For Each ctl In step2.Controls
-        If TypeName(ctl) = "CommandButton" Then
-            ctl.Top = 161
-            ctl.Height = 22
-            ctl.Visible = True
-        End If
-    Next ctl
+    ' Ne pas reafficher ni superposer l'ancien bouton Terminer.
+    btnTerminerNuevo.Top = txtCommentaireNuevo.Top + txtCommentaireNuevo.Height + 8
+    btnTerminerNuevo.Left = step2.Width - btnTerminerNuevo.Width - 12
+    btnTerminerNuevo.ZOrder 0
+    step2.Height = btnTerminerNuevo.Top + btnTerminerNuevo.Height + 10
     bottom = step2.Top + step2.Height
     vue.Height = bottom - vue.Top
     ' Boutons de pied de formulaire, dont Sauvegarder.
@@ -329,6 +341,7 @@ Failed:
     loading = False
     cmb_Ajouter.Enabled = False
     cmb_Terminer.Enabled = False
+    If Not btnTerminerNuevo Is Nothing Then btnTerminerNuevo.Enabled = False
     MsgBox "Initialisation impossible : " & Err.Description, vbExclamation
 End Sub
 
@@ -473,6 +486,11 @@ Sub LoadSelectedData()
     cmbActividadNuevo.Value = CStr(ws.Cells(currentRow, 5).Value)
     cmbMotivoNuevo.Value = CStr(ws.Cells(currentRow, 6).Value)
     txtCommentaireNuevo.Value = CStr(ws.Cells(currentRow, 7).Value)
+End Sub
+
+Private Sub btnTerminerNuevo_Click()
+    ' Les validations et l'enregistrement restent dans la procedure existante.
+    cmb_Terminer_Click
 End Sub
 
 Private Sub cmb_Terminer_Click()
