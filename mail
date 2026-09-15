@@ -1,20 +1,22 @@
 Sub CONSOLID()
- Dim wsC As Worksheet
+
+    Dim wsC As Worksheet
     Dim f As String, ligne As String
     Dim champs() As String
     Dim num As Integer
     Dim premiereLigne As Boolean
     Dim dl As Long, total As Long, nFichiers As Long
+    Dim dateDebut As Date, dateFin As Date
 
     Set wsC = FeuilleConsolidation()
     wsC.Cells.Clear
 
-    ' Nouvelle nomenclature issue des CSV Agent.
-    wsC.Range("A1:M1").Value = Array( _
+    ' En-têtes
+    wsC.Range("A1:N1").Value = Array( _
         "AGENTS", _
         "TYPLOGIES", _
         "DATE DE DEBUT", _
-        "Date DE FIN", _
+        "DATE DE FIN", _
         "TYPE DE CREDIT", _
         "TYPE PRODUIT", _
         "REF", _
@@ -23,7 +25,8 @@ Sub CONSOLID()
         "COMMENT", _
         "DMT", _
         "CANAL", _
-        "MATCH")
+        "MATCH", _
+        "MOIS")
 
     wsC.Rows(1).Font.Bold = True
 
@@ -40,62 +43,152 @@ Sub CONSOLID()
     
     Dim fichiersCSV As Collection
     Dim cheminCSV As Variant
+    
     Set fichiersCSV = New Collection
 
     f = Dir(CONSO_FOLDER & "*.csv")
+    
     Do While f <> ""
-        If Left$(f, 1) <> "~" Then fichiersCSV.Add CONSO_FOLDER & f
+        If Left$(f, 1) <> "~" Then
+            fichiersCSV.Add CONSO_FOLDER & f
+        End If
         f = Dir()
     Loop
 
     For Each cheminCSV In fichiersCSV
+        
         nFichiers = nFichiers + 1
         num = FreeFile
+        
         Open CStr(cheminCSV) For Input As #num
+        
         premiereLigne = True
 
         Do While Not EOF(num)
+            
             Line Input #num, ligne
 
             If premiereLigne Then
+                
                 premiereLigne = False
+                
             ElseIf Len(Trim$(ligne)) > 0 Then
+                
                 champs = Split(ligne, ";")
+                
                 dl = wsC.Cells(wsC.Rows.Count, 1).End(xlUp).Row + 1
 
+                ' ==============================
+                ' IMPORT DES DONNEES CSV
+                ' ==============================
+                
                 If UBound(champs) >= 0 Then wsC.Cells(dl, 1).Value = champs(0)
                 If UBound(champs) >= 1 Then wsC.Cells(dl, 2).Value = champs(1)
-                If UBound(champs) >= 2 Then wsC.Cells(dl, 3).Value = champs(2)
-                If UBound(champs) >= 3 Then wsC.Cells(dl, 4).Value = champs(3)
+                
+                ' DATE DE DEBUT
+                If UBound(champs) >= 2 Then
+                    If IsDate(champs(2)) Then
+                        dateDebut = CDate(champs(2))
+                        wsC.Cells(dl, 3).Value = dateDebut
+                    Else
+                        wsC.Cells(dl, 3).Value = champs(2)
+                    End If
+                End If
+                
+                ' DATE DE FIN
+                If UBound(champs) >= 3 Then
+                    If IsDate(champs(3)) Then
+                        dateFin = CDate(champs(3))
+                        wsC.Cells(dl, 4).Value = dateFin
+                    Else
+                        wsC.Cells(dl, 4).Value = champs(3)
+                    End If
+                End If
+                
                 If UBound(champs) >= 4 Then wsC.Cells(dl, 5).Value = champs(4)
                 If UBound(champs) >= 5 Then wsC.Cells(dl, 6).Value = champs(5)
                 If UBound(champs) >= 6 Then wsC.Cells(dl, 7).Value = champs(6)
                 If UBound(champs) >= 7 Then wsC.Cells(dl, 8).Value = champs(7)
                 If UBound(champs) >= 8 Then wsC.Cells(dl, 9).Value = champs(8)
                 If UBound(champs) >= 9 Then wsC.Cells(dl, 10).Value = champs(9)
-                If UBound(champs) >= 10 Then wsC.Cells(dl, 11).Value = champs(10)
-                If UBound(champs) >= 11 Then wsC.Cells(dl, 12).Value = champs(11)
+
+                ' ==============================
+                ' CALCUL DMT
+                ' Date de fin - Date de début
+                ' ==============================
+                
+                If IsDate(wsC.Cells(dl, 3).Value) And _
+                   IsDate(wsC.Cells(dl, 4).Value) Then
+                    
+                    wsC.Cells(dl, 11).Value = _
+                        CDbl(wsC.Cells(dl, 4).Value) - _
+                        CDbl(wsC.Cells(dl, 3).Value)
+                        
+                Else
+                    wsC.Cells(dl, 11).Value = ""
+                End If
+
+                ' CANAL
+                If UBound(champs) >= 11 Then
+                    wsC.Cells(dl, 12).Value = champs(11)
+                End If
+                
+                ' MATCH
+                If UBound(champs) >= 12 Then
+                    wsC.Cells(dl, 13).Value = champs(12)
+                End If
+
+                ' ==============================
+                ' MOIS + ANNEE
+                ' basé sur DATE DE DEBUT
+                ' Exemple : Septembre 2026
+                ' ==============================
+                
+                If IsDate(wsC.Cells(dl, 3).Value) Then
+                    wsC.Cells(dl, 14).Value = _
+                        Format(wsC.Cells(dl, 3).Value, "mmmm yyyy")
+                Else
+                    wsC.Cells(dl, 14).Value = ""
+                End If
 
                 total = total + 1
+                
             End If
+            
         Loop
 
         Close #num
+        
     Next cheminCSV
 
-    wsC.Columns("A:L").AutoFit
+    ' ==============================
+    ' FORMATAGE
+    ' ==============================
+    
+    wsC.Columns("C:D").NumberFormat = "dd/mm/yyyy hh:mm:ss"
+    
+    ' DMT affichée en durée
+    wsC.Columns("K").NumberFormat = "[h]:mm:ss"
+    
+    wsC.Columns("A:N").AutoFit
+
     Application.ScreenUpdating = True
 
     MsgBox total & " ligne(s) consolidée(s) depuis " & _
            nFichiers & " fichier(s) CSV.", vbInformation
+
     Exit Sub
     
 
 GestionErreur:
+
     On Error Resume Next
+    
     If num > 0 Then Close #num
+    
     Application.ScreenUpdating = True
-    MsgBox "Erreur pendant la consolidation : " & Err.Description, vbCritical
     
-    
+    MsgBox "Erreur pendant la consolidation : " & _
+           Err.Description, vbCritical
+
 End Sub
