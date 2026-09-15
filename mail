@@ -1,16 +1,101 @@
-Objet : Prise en compte du critère 6.3 – Accessibilité des liens dans les PDF
+Sub CONSOLID()
+ Dim wsC As Worksheet
+    Dim f As String, ligne As String
+    Dim champs() As String
+    Dim num As Integer
+    Dim premiereLigne As Boolean
+    Dim dl As Long, total As Long, nFichiers As Long
 
-Bonjour,
+    Set wsC = FeuilleConsolidation()
+    wsC.Cells.Clear
 
-Pour les prochains documents PDF déposés par la DIRCOM, serait-il possible de veiller à ce que chaque lien hypertexte respecte le critère 6.3 relatif à l’accessibilité ?
+    ' Nouvelle nomenclature issue des CSV Agent.
+    wsC.Range("A1:M1").Value = Array( _
+        "AGENTS", _
+        "TYPLOGIES", _
+        "DATE DE DEBUT", _
+        "Date DE FIN", _
+        "TYPE DE CREDIT", _
+        "TYPE PRODUIT", _
+        "REF", _
+        "TYPE SIGNATURE", _
+        "DECISION", _
+        "COMMENT", _
+        "DMT", _
+        "CANAL", _
+        "MATCH")
 
-Ce critère précise qu’un lien ne doit pas être identifiable uniquement par sa couleur. Lorsqu’un lien n’est pas souligné ou distingué par un autre élément visuel, il doit notamment présenter un contraste suffisant avec le texte environnant (contraste d’au moins 3:1 selon le critère indiqué dans notre grille).
+    wsC.Rows(1).Font.Bold = True
 
-Cette précaution est importante en matière d’accessibilité, car certains utilisateurs, notamment les personnes ayant une déficience de perception des couleurs, peuvent avoir des difficultés à distinguer un lien du reste du texte lorsque seule la couleur permet de l’identifier.
+    If Dir(CONSO_FOLDER, vbDirectory) = "" Then
+        MsgBox "Dossier introuvable : " & CONSO_FOLDER, vbExclamation
+        Exit Sub
+    End If
 
-Afin de faciliter la mise en accessibilité des prochains documents et d’éviter des non-conformités lors des contrôles, merci donc de prendre en compte ce point dès la création des PDF déposés pour traitement.
+    Application.ScreenUpdating = False
+    On Error GoTo GestionErreur
 
-Merci par avance pour votre prise en compte.
+    total = 0
+    nFichiers = 0
+    
+    Dim fichiersCSV As Collection
+    Dim cheminCSV As Variant
+    Set fichiersCSV = New Collection
 
-Bien cordialement,
-Mohamed Amine
+    f = Dir(CONSO_FOLDER & "*.csv")
+    Do While f <> ""
+        If Left$(f, 1) <> "~" Then fichiersCSV.Add CONSO_FOLDER & f
+        f = Dir()
+    Loop
+
+    For Each cheminCSV In fichiersCSV
+        nFichiers = nFichiers + 1
+        num = FreeFile
+        Open CStr(cheminCSV) For Input As #num
+        premiereLigne = True
+
+        Do While Not EOF(num)
+            Line Input #num, ligne
+
+            If premiereLigne Then
+                premiereLigne = False
+            ElseIf Len(Trim$(ligne)) > 0 Then
+                champs = Split(ligne, ";")
+                dl = wsC.Cells(wsC.Rows.Count, 1).End(xlUp).Row + 1
+
+                If UBound(champs) >= 0 Then wsC.Cells(dl, 1).Value = champs(0)
+                If UBound(champs) >= 1 Then wsC.Cells(dl, 2).Value = champs(1)
+                If UBound(champs) >= 2 Then wsC.Cells(dl, 3).Value = champs(2)
+                If UBound(champs) >= 3 Then wsC.Cells(dl, 4).Value = champs(3)
+                If UBound(champs) >= 4 Then wsC.Cells(dl, 5).Value = champs(4)
+                If UBound(champs) >= 5 Then wsC.Cells(dl, 6).Value = champs(5)
+                If UBound(champs) >= 6 Then wsC.Cells(dl, 7).Value = champs(6)
+                If UBound(champs) >= 7 Then wsC.Cells(dl, 8).Value = champs(7)
+                If UBound(champs) >= 8 Then wsC.Cells(dl, 9).Value = champs(8)
+                If UBound(champs) >= 9 Then wsC.Cells(dl, 10).Value = champs(9)
+                If UBound(champs) >= 10 Then wsC.Cells(dl, 11).Value = champs(10)
+                If UBound(champs) >= 11 Then wsC.Cells(dl, 12).Value = champs(11)
+
+                total = total + 1
+            End If
+        Loop
+
+        Close #num
+    Next cheminCSV
+
+    wsC.Columns("A:L").AutoFit
+    Application.ScreenUpdating = True
+
+    MsgBox total & " ligne(s) consolidée(s) depuis " & _
+           nFichiers & " fichier(s) CSV.", vbInformation
+    Exit Sub
+    
+
+GestionErreur:
+    On Error Resume Next
+    If num > 0 Then Close #num
+    Application.ScreenUpdating = True
+    MsgBox "Erreur pendant la consolidation : " & Err.Description, vbCritical
+    
+    
+End Sub
