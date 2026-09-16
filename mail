@@ -1,250 +1,121 @@
-/* =========================================================
-   FINAL MANAGER ADDITIONS
-========================================================= */
+async function connectSharedFolder() {
 
-.hidden {
-    display: none !important;
-}
+    const button =
+        document.getElementById("connectFolderButton");
 
+    try {
 
-/* IMPORT */
+        console.log("Ouverture du sélecteur...");
 
-.import-zone {
-    min-height: 260px;
-    border: 2px dashed #d9dee8;
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    cursor: pointer;
-    transition: 0.2s ease;
-    padding: 30px;
-}
+        const handle =
+            await window.showDirectoryPicker({
+                mode: "readwrite"
+            });
 
-.import-zone:hover,
-.import-zone.dragging {
-    border-color: #5067e8;
-    background: #f8f9ff;
-}
-
-.import-icon {
-    font-size: 36px;
-    margin-bottom: 15px;
-}
+        console.log("Dossier sélectionné :", handle);
+        console.log("Nom :", handle.name);
 
 
-/* ASSIGNMENTS */
+        // Vérification permission
+        let permission =
+            await handle.queryPermission({
+                mode: "readwrite"
+            });
 
-.assignment-header {
-    gap: 20px;
-}
-
-.assignment-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.assignment-toolbar {
-    display: flex;
-    gap: 12px;
-    padding: 15px 20px;
-    border-top: 1px solid #edf0f5;
-    border-bottom: 1px solid #edf0f5;
-}
-
-.assignment-toolbar input {
-    flex: 1;
-}
-
-.assignment-toolbar input,
-.assignment-toolbar select,
-.agent-assignment-select,
-.assignment-actions select {
-    min-height: 40px;
-    border: 1px solid #dfe3eb;
-    border-radius: 8px;
-    padding: 0 12px;
-    background: white;
-}
+        console.log(
+            "Permission actuelle :",
+            permission
+        );
 
 
-/* AGENTS */
+        if (permission !== "granted") {
 
-.agents-grid {
-    display: grid;
-    grid-template-columns: repeat(
-        auto-fill,
-        minmax(220px, 1fr)
-    );
-    gap: 16px;
-}
+            permission =
+                await handle.requestPermission({
+                    mode: "readwrite"
+                });
 
-.agent-card {
-    border: 1px solid #e8ebf1;
-    border-radius: 14px;
-    padding: 18px;
-    background: white;
-}
-
-.agent-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-}
-
-.agent-large-avatar,
-.distribution-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #eef1ff;
-    font-weight: 700;
-}
-
-.delete-agent-btn {
-    border: none;
-    background: transparent;
-    font-size: 22px;
-    cursor: pointer;
-    color: #9ca3af;
-}
-
-.delete-agent-btn:hover {
-    color: #dc2626;
-}
-
-.agent-id {
-    color: #8a93a5;
-    font-size: 12px;
-}
-
-.agent-stat {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid #edf0f5;
-    display: flex;
-    justify-content: space-between;
-}
-
-.agent-link {
-    margin-top: 12px;
-    font-size: 11px;
-    background: #f7f8fb;
-    border-radius: 7px;
-    padding: 8px;
-    word-break: break-all;
-}
+        }
 
 
-/* ADD AGENT */
-
-.add-agent-form {
-    display: flex;
-    align-items: flex-end;
-    gap: 12px;
-    padding: 18px;
-    margin-bottom: 20px;
-    background: #f8f9fc;
-    border-radius: 12px;
-}
-
-.add-agent-form .form-field {
-    flex: 1;
-}
-
-.add-agent-form label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.add-agent-form input {
-    width: 100%;
-    min-height: 40px;
-    box-sizing: border-box;
-    border: 1px solid #dfe3eb;
-    border-radius: 8px;
-    padding: 0 12px;
-}
+        console.log(
+            "Permission finale :",
+            permission
+        );
 
 
-/* DISTRIBUTION */
+        if (permission !== "granted") {
 
-.agent-distribution {
-    display: grid;
-    grid-template-columns: repeat(
-        auto-fill,
-        minmax(210px, 1fr)
-    );
-    gap: 12px;
-}
+            throw new Error(
+                "Permission d'écriture refusée."
+            );
 
-.distribution-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: 1px solid #e9ecf2;
-    padding: 14px;
-    border-radius: 12px;
-}
-
-.distribution-info {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-}
-
-.distribution-info span {
-    font-size: 11px;
-    color: #8b94a5;
-}
-
-.distribution-count {
-    font-size: 20px;
-}
+        }
 
 
-/* FOLDER */
-
-#connectFolderButton.connected {
-    border-color: #16a34a;
-    color: #15803d;
-}
-
-
-/* FOOTER */
-
-.card-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding: 18px 20px;
-    border-top: 1px solid #edf0f5;
-}
+        // Test réel : accès/création du dossier data
+        const dataFolder =
+            await handle.getDirectoryHandle(
+                "data",
+                {
+                    create: true
+                }
+            );
 
 
-/* RESPONSIVE */
+        // Test réel : accès/création de data/agents
+        await dataFolder.getDirectoryHandle(
+            "agents",
+            {
+                create: true
+            }
+        );
 
-@media (max-width: 1000px) {
 
-    .assignment-actions {
-        width: 100%;
+        // Seulement maintenant on considère
+        // le dossier comme connecté
+        sharedFolderHandle = handle;
+
+
+        button.textContent =
+            "✓ Dossier connecté";
+
+
+        button.classList.add(
+            "connected"
+        );
+
+
+        showToast(
+            "✓ Dossier connecté avec succès."
+        );
+
+
+        console.log(
+            "Connexion réussie :",
+            handle.name
+        );
+
     }
+    catch (error) {
 
-    .assignment-toolbar {
-        flex-direction: column;
-    }
+        sharedFolderHandle = null;
 
-    .add-agent-form {
-        flex-direction: column;
-        align-items: stretch;
+
+        button.textContent =
+            "⚠ Connexion échouée";
+
+
+        console.error(
+            "ERREUR CONNEXION DOSSIER :",
+            error
+        );
+
+
+        showToast(
+            `${error.name}: ${error.message}`
+        );
+
     }
 
 }
