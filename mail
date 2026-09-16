@@ -1,1947 +1,708 @@
-/* ==========================================================
-   AGENT ID FROM URL
+<!DOCTYPE html>
+<html lang="fr">
 
-   Example:
-   agent.html?agent=HAMDANMO
-========================================================== */
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-const params =
-    new URLSearchParams(
-        window.location.search
-    );
+    <title>Gestion Traitement - Manager</title>
 
+    <link rel="stylesheet" href="css/manager.css">
+</head>
 
-const AGENT_ID =
-    (
-        params.get("agent")
-        ||
-        "HAMDANMO"
-    )
-    .trim()
-    .toUpperCase();
+<body>
 
+<div class="app">
 
-const AGENT = {
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
-    id: AGENT_ID,
+    <aside class="sidebar">
 
-    name: AGENT_ID
+        <div class="brand">
 
-};
-
-
-/* ==========================================================
-   MANAGER DATA
-
-   This variable will be populated by:
-   data/agents/HAMDANMO.js
-========================================================== */
-
-window.AGENT_DATA = null;
-
-
-/* ==========================================================
-   LOCAL STORAGE
-========================================================== */
-
-const STORAGE_KEY =
-    `gestion_traitement_agent_${AGENT.id}`;
-
-
-function defaultState() {
-
-    return {
-
-        assignments: [],
-
-        completed: [],
-
-        activeTreatmentId: null
-
-    };
-
-}
-
-
-function loadState() {
-
-    const saved =
-        localStorage.getItem(
-            STORAGE_KEY
-        );
-
-
-    if (!saved) {
-
-        return defaultState();
-
-    }
-
-
-    try {
-
-        return JSON.parse(
-            saved
-        );
-
-    }
-    catch {
-
-        return defaultState();
-
-    }
-
-}
-
-
-let state =
-    loadState();
-
-
-function saveState() {
-
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(state)
-    );
-
-}
-
-
-/* ==========================================================
-   VARIABLES
-========================================================== */
-
-let selectedLineId =
-    null;
-
-
-let toastTimer;
-
-
-/* ==========================================================
-   ELEMENTS
-========================================================== */
-
-const pendingList =
-    document.getElementById(
-        "pendingList"
-    );
-
-
-const dashboardTable =
-    document.getElementById(
-        "dashboardTable"
-    );
-
-
-const historyTable =
-    document.getElementById(
-        "historyTable"
-    );
-
-
-const emptySelection =
-    document.getElementById(
-        "emptySelection"
-    );
-
-
-const selectedDetails =
-    document.getElementById(
-        "selectedDetails"
-    );
-
-
-const treatmentForm =
-    document.getElementById(
-        "treatmentForm"
-    );
-
-
-const takeButton =
-    document.getElementById(
-        "takeButton"
-    );
-
-
-const pendingSearch =
-    document.getElementById(
-        "pendingSearch"
-    );
-
-
-const historySearch =
-    document.getElementById(
-        "historySearch"
-    );
-
-
-/* ==========================================================
-   LOAD MANAGER DATA FILE
-========================================================== */
-
-function loadManagerAssignments() {
-
-    return new Promise(
-        resolve => {
-
-            window.AGENT_DATA =
-                null;
-
-
-            /*
-                Remove previous data script.
-            */
-
-            const previous =
-                document.getElementById(
-                    "agentDataScript"
-                );
-
-
-            if (previous) {
-
-                previous.remove();
-
-            }
-
-
-            const script =
-                document.createElement(
-                    "script"
-                );
-
-
-            script.id =
-                "agentDataScript";
-
-
-            /*
-                Timestamp prevents browser caching.
-            */
-
-            script.src =
-                `data/agents/${encodeURIComponent(AGENT.id)}.js?t=${Date.now()}`;
-
-
-            script.onload =
-                () => {
-
-                    if (
-                        window.AGENT_DATA
-                    ) {
-
-                        if (
-                            window.AGENT_DATA.agentName
-                        ) {
-
-                            AGENT.name =
-                                window.AGENT_DATA.agentName;
-
-                        }
-
-
-                        mergeManagerAssignments(
-                            window.AGENT_DATA.assignments || []
-                        );
-
-                    }
-
-
-                    resolve(true);
-
-                };
-
-
-            script.onerror =
-                () => {
-
-                    console.warn(
-                        `Aucun fichier d'affectation pour ${AGENT.id}.`
-                    );
-
-
-                    /*
-                        Do NOT delete local work just because
-                        Manager file couldn't be read.
-                    */
-
-                    renderAll();
-
-                    resolve(false);
-
-                };
-
-
-            document.body.appendChild(
-                script
-            );
-
-        }
-    );
-
-}
-
-
-/* ==========================================================
-   MERGE MANAGER DATA
-========================================================== */
-
-function mergeManagerAssignments(
-    managerAssignments
-) {
-
-    const completedIds =
-        new Set(
-            state.completed.map(
-                item => item.id
-            )
-        );
-
-
-    const existingMap =
-        new Map(
-            state.assignments.map(
-                item => [
-                    item.id,
-                    item
-                ]
-            )
-        );
-
-
-    const merged =
-        [];
-
-
-    managerAssignments.forEach(
-        managerItem => {
-
-            /*
-                Never recreate a locally completed line.
-            */
-
-            if (
-                completedIds.has(
-                    managerItem.id
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            const existing =
-                existingMap.get(
-                    managerItem.id
-                );
-
-
-            /*
-                Preserve an active treatment.
-            */
-
-            if (
-                existing &&
-                existing.status ===
-                    "processing"
-            ) {
-
-                merged.push(
-                    existing
-                );
-
-                return;
-
-            }
-
-
-            merged.push({
-
-                ...managerItem,
-
-                status:
-                    "pending"
-
-            });
-
-        }
-    );
-
-
-    /*
-        If an active treatment was removed from
-        Manager while the agent was working on it,
-        preserve it until the agent finishes/cancels.
-    */
-
-    if (
-        state.activeTreatmentId
-    ) {
-
-        const activeExisting =
-            existingMap.get(
-                state.activeTreatmentId
-            );
-
-
-        const alreadyIncluded =
-            merged.some(
-                item =>
-                    item.id ===
-                    state.activeTreatmentId
-            );
-
-
-        if (
-            activeExisting &&
-            !alreadyIncluded
-        ) {
-
-            merged.push(
-                activeExisting
-            );
-
-        }
-
-    }
-
-
-    state.assignments =
-        merged;
-
-
-    saveState();
-
-    initializeAgent();
-
-    renderAll();
-
-}
-
-
-/* ==========================================================
-   REFRESH
-========================================================== */
-
-async function refreshAssignments() {
-
-    const loaded =
-        await loadManagerAssignments();
-
-
-    if (loaded) {
-
-        showToast(
-            "Affectations actualisées."
-        );
-
-    }
-    else {
-
-        showToast(
-            "Aucune nouvelle affectation disponible."
-        );
-
-    }
-
-}
-
-
-/* ==========================================================
-   AGENT UI
-========================================================== */
-
-function initializeAgent() {
-
-    const initials =
-        getInitials(
-            AGENT.name
-        );
-
-
-    document.getElementById(
-        "agentName"
-    ).textContent =
-        AGENT.name;
-
-
-    document.getElementById(
-        "topAgentName"
-    ).textContent =
-        AGENT.name;
-
-
-    document.getElementById(
-        "welcomeAgent"
-    ).textContent =
-        AGENT.name;
-
-
-    document.getElementById(
-        "agentInitials"
-    ).textContent =
-        initials;
-
-
-    document.getElementById(
-        "topInitials"
-    ).textContent =
-        initials;
-
-}
-
-
-/* ==========================================================
-   NAVIGATION
-========================================================== */
-
-document
-    .querySelectorAll(
-        ".nav-btn"
-    )
-    .forEach(
-        button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    showPage(
-                        button.dataset.page
-                    );
-
-                }
-            );
-
-        }
-    );
-
-
-function showPage(
-    pageName
-) {
-
-    document
-        .querySelectorAll(
-            ".page"
-        )
-        .forEach(
-            page =>
-                page.classList.remove(
-                    "active"
-                )
-        );
-
-
-    document
-        .querySelectorAll(
-            ".nav-btn"
-        )
-        .forEach(
-            button =>
-                button.classList.remove(
-                    "active"
-                )
-        );
-
-
-    document
-        .getElementById(
-            pageName
-        )
-        .classList.add(
-            "active"
-        );
-
-
-    document
-        .querySelector(
-            `[data-page="${pageName}"]`
-        )
-        .classList.add(
-            "active"
-        );
-
-
-    const titles = {
-
-        dashboard: [
-            "Tableau de bord",
-            "Suivez et traitez vos lignes affectées."
-        ],
-
-        pending: [
-            "À traiter",
-            "Consultez vos lignes affectées."
-        ],
-
-        history: [
-            "Historique",
-            "Consultez vos traitements terminés."
-        ]
-
-    };
-
-
-    document.getElementById(
-        "pageTitle"
-    ).textContent =
-        titles[pageName][0];
-
-
-    document.getElementById(
-        "pageSubtitle"
-    ).textContent =
-        titles[pageName][1];
-
-
-    if (
-        pageName ===
-        "history"
-    ) {
-
-        renderHistory();
-
-    }
-
-}
-
-
-function openPendingPage() {
-
-    showPage(
-        "pending"
-    );
-
-}
-
-
-/* ==========================================================
-   PENDING
-========================================================== */
-
-function getPendingAssignments() {
-
-    return state.assignments.filter(
-        item =>
-
-            item.status ===
-                "pending"
-
-            ||
-
-            item.status ===
-                "processing"
-    );
-
-}
-
-
-/* ==========================================================
-   COUNTERS
-========================================================== */
-
-function updateCounters() {
-
-    const pending =
-        state.assignments.filter(
-            item =>
-                item.status ===
-                "pending"
-        ).length;
-
-
-    const processing =
-        state.assignments.filter(
-            item =>
-                item.status ===
-                "processing"
-        ).length;
-
-
-    const completed =
-        state.completed.length;
-
-
-    document.getElementById(
-        "pendingCount"
-    ).textContent =
-        pending;
-
-
-    document.getElementById(
-        "processingCount"
-    ).textContent =
-        processing;
-
-
-    document.getElementById(
-        "completedCount"
-    ).textContent =
-        completed;
-
-
-    document.getElementById(
-        "navPendingCount"
-    ).textContent =
-        pending;
-
-
-    document.getElementById(
-        "queueCount"
-    ).textContent =
-        pending + processing;
-
-}
-
-
-/* ==========================================================
-   DASHBOARD
-========================================================== */
-
-function renderDashboard() {
-
-    dashboardTable.innerHTML =
-        "";
-
-
-    const rows =
-        getPendingAssignments()
-            .slice(
-                0,
-                5
-            );
-
-
-    if (
-        rows.length === 0
-    ) {
-
-        dashboardTable.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="5"
-                    style="
-                        text-align:center;
-                        padding:30px;
-                        color:#9ca3af;
-                    "
-                >
-                    Aucune ligne à traiter.
-                </td>
-
-            </tr>
-
-        `;
-
-        return;
-
-    }
-
-
-    rows.forEach(
-        item => {
-
-            dashboardTable.insertAdjacentHTML(
-                "beforeend",
-                `
-
-                <tr>
-
-                    <td>
-                        ${escapeHTML(item.line.siret)}
-                    </td>
-
-                    <td>
-                        <strong>
-                            ${escapeHTML(item.line.raisonSociale)}
-                        </strong>
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.typeFacture || "—")}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.dateLimite || "—")}
-                    </td>
-
-                    <td>
-
-                        ${
-                            item.status ===
-                            "processing"
-
-                            ? `
-                                <span class="status processing-status">
-                                    En cours
-                                </span>
-                              `
-
-                            : `
-                                <span class="status pending-status">
-                                    À traiter
-                                </span>
-                              `
-                        }
-
-                    </td>
-
-                </tr>
-
-                `
-            );
-
-        }
-    );
-
-}
-
-
-/* ==========================================================
-   PENDING LIST
-========================================================== */
-
-function renderPendingList() {
-
-    pendingList.innerHTML =
-        "";
-
-
-    const search =
-        pendingSearch.value
-            .trim()
-            .toLowerCase();
-
-
-    const items =
-        getPendingAssignments()
-            .filter(
-                item => {
-
-                    return (
-
-                        item.line.siret
-                            .toLowerCase()
-                            .includes(
-                                search
-                            )
-
-                        ||
-
-                        item.line.raisonSociale
-                            .toLowerCase()
-                            .includes(
-                                search
-                            )
-
-                    );
-
-                }
-            );
-
-
-    if (
-        items.length === 0
-    ) {
-
-        pendingList.innerHTML = `
-
-            <div style="
-                text-align:center;
-                padding:35px;
-                color:#9ca3af;
-                font-size:11px;
-            ">
-                Aucune ligne à traiter.
+            <div class="brand-logo">
+                GT
             </div>
 
-        `;
-
-        return;
-
-    }
-
-
-    items.forEach(
-        item => {
-
-            const element =
-                document.createElement(
-                    "div"
-                );
-
-
-            element.className =
-                "pending-item";
-
-
-            if (
-                selectedLineId ===
-                item.id
-            ) {
-
-                element.classList.add(
-                    "selected"
-                );
-
-            }
-
-
-            element.innerHTML = `
-
-                <div class="pending-item-top">
-
-                    <span class="pending-company">
-
-                        ${escapeHTML(
-                            item.line.raisonSociale
-                        )}
-
-                    </span>
-
-
-                    ${
-                        item.status ===
-                        "processing"
-
-                        ? `
-                            <span class="status processing-status">
-                                En cours
-                            </span>
-                          `
-
-                        : `
-                            <span class="status pending-status">
-                                À traiter
-                            </span>
-                          `
-                    }
-
-                </div>
-
-
-                <div class="pending-siret">
-
-                    SIRET :
-                    ${escapeHTML(
-                        item.line.siret
-                    )}
-
-                </div>
-
-
-                <div class="pending-meta">
-
-                    <span>
-                        Facture :
-                        ${escapeHTML(
-                            item.line.typeFacture || "—"
-                        )}
-                    </span>
-
-                    <span>
-                        ${escapeHTML(
-                            item.line.dateLimite || "—"
-                        )}
-                    </span>
-
-                </div>
-
-            `;
-
-
-            element.addEventListener(
-                "click",
-                () => {
-
-                    selectLine(
-                        item.id
-                    );
-
-                }
-            );
-
-
-            pendingList.appendChild(
-                element
-            );
-
-        }
-    );
-
-}
-
-
-/* ==========================================================
-   SELECT
-========================================================== */
-
-function selectLine(
-    id
-) {
-
-    const item =
-        state.assignments.find(
-            row =>
-                row.id === id
-        );
-
-
-    if (!item) {
-        return;
-    }
-
-
-    if (
-        state.activeTreatmentId &&
-        state.activeTreatmentId !== id
-    ) {
-
-        showToast(
-            "Une autre ligne est déjà en cours."
-        );
-
-        return;
-
-    }
-
-
-    selectedLineId =
-        id;
-
-
-    renderPendingList();
-
-    displaySelectedLine(
-        item
-    );
-
-}
-
-
-/* ==========================================================
-   DETAILS
-========================================================== */
-
-function displaySelectedLine(
-    item
-) {
-
-    emptySelection.classList.add(
-        "hidden"
-    );
-
-
-    selectedDetails.classList.remove(
-        "hidden"
-    );
-
-
-    document.getElementById(
-        "selectedCompany"
-    ).textContent =
-        item.line.raisonSociale;
-
-
-    document.getElementById(
-        "selectedSiret"
-    ).textContent =
-        `SIRET : ${item.line.siret}`;
-
-
-    renderInformation(
-
-        document.getElementById(
-            "sourceInformation"
-        ),
-
-        [
-
-            [
-                "Nom CSP",
-                item.source?.nomCSP
-            ],
-
-            [
-                "Contrat BAD",
-                item.source?.contratBAD
-            ],
-
-            [
-                "IDT Connexion",
-                item.source?.idtConnexion
-            ],
-
-            [
-                "MDP CSP",
-                item.source?.mdpCSP
-            ],
-
-            [
-                "N° Abonné CSP",
-                item.source?.numeroAbonneCSP
-            ],
-
-            [
-                "IBAN",
-                item.source?.iban
-            ]
-
-        ]
-
-    );
-
-
-    renderInformation(
-
-        document.getElementById(
-            "lineInformation"
-        ),
-
-        [
-
-            [
-                "Raison sociale",
-                item.line.raisonSociale
-            ],
-
-            [
-                "SIRET",
-                item.line.siret
-            ],
-
-            [
-                "Type facture",
-                item.line.typeFacture
-            ],
-
-            [
-                "Date limite",
-                item.line.dateLimite
-            ]
-
-        ]
-
-    );
-
-
-    if (
-        item.status ===
-        "processing"
-    ) {
-
-        takeButton.classList.add(
-            "hidden"
-        );
-
-
-        treatmentForm.classList.remove(
-            "hidden"
-        );
-
-    }
-    else {
-
-        takeButton.classList.remove(
-            "hidden"
-        );
-
-
-        treatmentForm.classList.add(
-            "hidden"
-        );
-
-    }
-
-}
-
-
-/* ==========================================================
-   INFORMATION CARDS
-========================================================== */
-
-function renderInformation(
-    container,
-    information
-) {
-
-    container.innerHTML =
-        "";
-
-
-    information.forEach(
-        ([label, value]) => {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-
-            item.className =
-                "info-item";
-
-
-            const labelElement =
-                document.createElement(
-                    "span"
-                );
-
-
-            labelElement.className =
-                "info-label";
-
-
-            labelElement.textContent =
-                label;
-
-
-            const valueElement =
-                document.createElement(
-                    "span"
-                );
-
-
-            valueElement.className =
-                "info-value";
-
-
-            valueElement.textContent =
-                value || "—";
-
-
-            const copyButton =
-                document.createElement(
-                    "button"
-                );
-
-
-            copyButton.className =
-                "copy-button";
-
-
-            copyButton.textContent =
-                "⧉";
-
-
-            copyButton.addEventListener(
-                "click",
-                event => {
-
-                    event.stopPropagation();
-
-                    copyValue(
-                        value || ""
-                    );
-
-                }
-            );
-
-
-            item.append(
-                labelElement,
-                valueElement,
-                copyButton
-            );
-
-
-            container.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
-
-
-/* ==========================================================
-   TAKE
-========================================================== */
-
-function takeSelectedLine() {
-
-    if (!selectedLineId) {
-        return;
-    }
-
-
-    if (
-        state.activeTreatmentId &&
-        state.activeTreatmentId !==
-            selectedLineId
-    ) {
-
-        showToast(
-            "Une autre ligne est déjà en cours."
-        );
-
-        return;
-
-    }
-
-
-    const item =
-        state.assignments.find(
-            row =>
-                row.id ===
-                selectedLineId
-        );
-
-
-    if (!item) {
-        return;
-    }
-
-
-    item.status =
-        "processing";
-
-
-    state.activeTreatmentId =
-        item.id;
-
-
-    /*
-        Prefill with any existing line-level values first.
-        Otherwise use CSP source values.
-    */
-
-    document.getElementById(
-        "subscriberNumber"
-    ).value =
-        item.line.numeroAbonne ||
-        item.source?.numeroAbonneCSP ||
-        "";
-
-
-    document.getElementById(
-        "idt"
-    ).value =
-        item.line.identifiant ||
-        item.source?.idtConnexion ||
-        "";
-
-
-    document.getElementById(
-        "password"
-    ).value =
-        item.line.mdp ||
-        item.source?.mdpCSP ||
-        "";
-
-
-    document.getElementById(
-        "badContract"
-    ).value =
-        item.line.contratBAD ||
-        item.source?.contratBAD ||
-        "";
-
-
-    document.getElementById(
-        "csp"
-    ).value =
-        item.source?.nomCSP ||
-        "";
-
-
-    saveState();
-
-    renderAll();
-
-    displaySelectedLine(
-        item
-    );
-
-
-    showToast(
-        "Ligne prise en charge."
-    );
-
-}
-
-
-/* ==========================================================
-   CANCEL
-========================================================== */
-
-function cancelTreatment() {
-
-    const item =
-        state.assignments.find(
-            row =>
-                row.id ===
-                state.activeTreatmentId
-        );
-
-
-    if (!item) {
-        return;
-    }
-
-
-    item.status =
-        "pending";
-
-
-    state.activeTreatmentId =
-        null;
-
-
-    clearForm();
-
-    saveState();
-
-    renderAll();
-
-    displaySelectedLine(
-        item
-    );
-
-
-    showToast(
-        "Traitement annulé."
-    );
-
-}
-
-
-/* ==========================================================
-   COMPLETE
-========================================================== */
-
-function completeTreatment() {
-
-    if (
-        !state.activeTreatmentId
-    ) {
-
-        return;
-
-    }
-
-
-    const treatment = {
-
-        numeroAbonne:
-            getValue(
-                "subscriberNumber"
-            ),
-
-        idt:
-            getValue(
-                "idt"
-            ),
-
-        mdp:
-            getValue(
-                "password"
-            ),
-
-        contratBAD:
-            getValue(
-                "badContract"
-            ),
-
-        csp:
-            getValue(
-                "csp"
-            ),
-
-        commentaire:
-            getValue(
-                "comment"
-            )
-
-    };
-
-
-    if (
-        !treatment.numeroAbonne ||
-        !treatment.idt ||
-        !treatment.mdp ||
-        !treatment.contratBAD ||
-        !treatment.csp
-    ) {
-
-        showToast(
-            "Complétez tous les champs obligatoires."
-        );
-
-        return;
-
-    }
-
-
-    const index =
-        state.assignments.findIndex(
-            row =>
-                row.id ===
-                state.activeTreatmentId
-        );
-
-
-    if (
-        index === -1
-    ) {
-        return;
-    }
-
-
-    const item =
-        state.assignments[index];
-
-
-    state.completed.unshift({
-
-        ...item,
-
-        status:
-            "completed",
-
-        treatment,
-
-        completedBy:
-            AGENT.name,
-
-        completedAt:
-            new Date()
-                .toLocaleString(
-                    "fr-FR"
-                )
-
-    });
-
-
-    state.assignments.splice(
-        index,
-        1
-    );
-
-
-    state.activeTreatmentId =
-        null;
-
-
-    selectedLineId =
-        null;
-
-
-    saveState();
-
-    clearForm();
-
-    closeDetails();
-
-    renderAll();
-
-
-    showToast(
-        "Traitement terminé."
-    );
-
-}
-
-
-/* ==========================================================
-   HISTORY
-========================================================== */
-
-function renderHistory() {
-
-    historyTable.innerHTML =
-        "";
-
-
-    const search =
-        historySearch.value
-            .trim()
-            .toLowerCase();
-
-
-    const rows =
-        state.completed.filter(
-            item =>
-
-                item.line.siret
-                    .toLowerCase()
-                    .includes(
-                        search
-                    )
-
-                ||
-
-                item.line.raisonSociale
-                    .toLowerCase()
-                    .includes(
-                        search
-                    )
-        );
-
-
-    if (
-        rows.length === 0
-    ) {
-
-        historyTable.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="7"
-                    style="
-                        text-align:center;
-                        padding:35px;
-                        color:#9ca3af;
-                    "
+            <div class="brand-text">
+                <strong>Gestion Traitement</strong>
+                <span>Espace Manager</span>
+            </div>
+
+        </div>
+
+
+        <nav class="navigation">
+
+            <button
+                class="nav-btn active"
+                data-page="dashboard"
+            >
+                <span class="nav-icon">▦</span>
+                <span>Tableau de bord</span>
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="import"
+            >
+                <span class="nav-icon">⇧</span>
+                <span>Import Excel</span>
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="assignments"
+            >
+                <span class="nav-icon">⇄</span>
+                <span>Affectations</span>
+
+                <span
+                    id="navUnassignedCount"
+                    class="nav-count"
                 >
-                    Aucun traitement terminé.
-                </td>
+                    0
+                </span>
+            </button>
 
-            </tr>
 
-        `;
+            <button
+                class="nav-btn"
+                data-page="agents"
+            >
+                <span class="nav-icon">♙</span>
+                <span>Agents</span>
+            </button>
 
-        return;
+        </nav>
 
-    }
 
+        <div class="manager-profile">
 
-    rows.forEach(
-        item => {
+            <div class="avatar">
+                MG
+            </div>
 
-            historyTable.insertAdjacentHTML(
-                "beforeend",
-                `
+            <div class="manager-profile-text">
+                <strong>Manager</strong>
+                <span>Gestionnaire</span>
+            </div>
 
-                <tr>
+        </div>
 
-                    <td>
-                        ${escapeHTML(item.line.siret)}
-                    </td>
+    </aside>
 
-                    <td>
-                        ${escapeHTML(item.line.raisonSociale)}
-                    </td>
 
-                    <td>
-                        ${escapeHTML(item.line.typeFacture || "—")}
-                    </td>
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
 
-                    <td>
-                        ${escapeHTML(item.treatment.numeroAbonne)}
-                    </td>
+    <main class="main">
 
-                    <td>
-                        ${escapeHTML(item.treatment.idt)}
-                    </td>
+        <!-- =================================================
+             TOPBAR
+        ================================================== -->
 
-                    <td>
-                        ${escapeHTML(item.treatment.contratBAD)}
-                    </td>
+        <header class="topbar">
 
-                    <td>
-                        ${escapeHTML(item.completedAt)}
-                    </td>
+            <div>
 
-                </tr>
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
 
-                `
-            );
+                <p id="pageSubtitle">
+                    Importez et répartissez les lignes entre les agents.
+                </p>
 
-        }
-    );
+            </div>
 
-}
 
+            <div class="topbar-actions">
 
-/* ==========================================================
-   HELPERS
-========================================================== */
+                <div
+                    id="currentDate"
+                    class="date-box"
+                >
+                </div>
 
-function getValue(
-    id
-) {
 
-    return document
-        .getElementById(id)
-        .value
-        .trim();
+                <button
+                    id="connectFolderButton"
+                    class="secondary-btn"
+                    onclick="connectSharedFolder()"
+                >
+                    📁 Connecter le dossier
+                </button>
 
-}
 
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
+                >
+                    + Importer Excel
+                </button>
 
-function clearForm() {
+            </div>
 
-    [
-        "subscriberNumber",
-        "idt",
-        "password",
-        "badContract",
-        "csp",
-        "comment"
+        </header>
 
-    ].forEach(
-        id => {
 
-            document.getElementById(
-                id
-            ).value =
-                "";
+        <!-- =================================================
+             DASHBOARD
+        ================================================== -->
 
-        }
-    );
+        <section
+            id="dashboard"
+            class="page active"
+        >
 
-}
+            <div class="welcome">
 
+                <div>
 
-function closeDetails() {
+                    <span class="eyebrow">
+                        ESPACE MANAGER
+                    </span>
 
-    selectedDetails.classList.add(
-        "hidden"
-    );
+                    <h2>
+                        Gestion des affectations
+                    </h2>
 
+                    <p>
+                        Importez le fichier source, contrôlez les données
+                        puis affectez les lignes aux agents.
+                    </p>
 
-    emptySelection.classList.remove(
-        "hidden"
-    );
+                </div>
 
-}
 
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
+                >
+                    + Nouvel import
+                </button>
 
-async function copyValue(
-    value
-) {
+            </div>
 
-    try {
 
-        await navigator.clipboard.writeText(
-            value
-        );
+            <!-- STATS -->
 
-    }
-    catch {
+            <div class="stats">
 
-        const area =
-            document.createElement(
-                "textarea"
-            );
+                <article class="stat-card">
 
+                    <div class="stat-icon">
+                        ≡
+                    </div>
 
-        area.value =
-            value;
+                    <div>
+                        <span>Lignes importées</span>
+                        <strong id="totalLinesCount">0</strong>
+                    </div>
 
+                </article>
 
-        document.body.appendChild(
-            area
-        );
 
+                <article class="stat-card">
 
-        area.select();
+                    <div class="stat-icon warning-icon">
+                        !
+                    </div>
 
+                    <div>
+                        <span>Non affectées</span>
+                        <strong id="unassignedCount">0</strong>
+                    </div>
 
-        document.execCommand(
-            "copy"
-        );
+                </article>
 
 
-        area.remove();
+                <article class="stat-card">
 
-    }
+                    <div class="stat-icon success-icon">
+                        ✓
+                    </div>
 
+                    <div>
+                        <span>Affectées</span>
+                        <strong id="assignedCount">0</strong>
+                    </div>
 
-    showToast(
-        "Copié."
-    );
+                </article>
 
-}
 
+                <article class="stat-card">
 
-function getInitials(
-    name
-) {
+                    <div class="stat-icon active-icon">
+                        ♙
+                    </div>
 
-    const words =
-        name
-            .trim()
-            .split(/\s+/);
+                    <div>
+                        <span>Agents</span>
+                        <strong id="agentsCount">0</strong>
+                    </div>
 
+                </article>
 
-    if (
-        words.length === 1
-    ) {
+            </div>
 
-        return words[0]
-            .substring(
-                0,
-                2
-            )
-            .toUpperCase();
 
-    }
+            <!-- LAST IMPORT -->
 
+            <div class="card">
 
-    return (
-        words[0][0] +
-        words[
-            words.length - 1
-        ][0]
-    )
-    .toUpperCase();
+                <div class="card-header">
 
-}
+                    <div>
+                        <h3>Dernier import</h3>
+                        <p>
+                            Informations du fichier actuellement chargé.
+                        </p>
+                    </div>
 
+                </div>
 
-function escapeHTML(
-    value
-) {
 
-    return String(
-        value ?? ""
-    )
-    .replaceAll(
-        "&",
-        "&amp;"
-    )
-    .replaceAll(
-        "<",
-        "&lt;"
-    )
-    .replaceAll(
-        ">",
-        "&gt;"
-    )
-    .replaceAll(
-        '"',
-        "&quot;"
-    )
-    .replaceAll(
-        "'",
-        "&#039;"
-    );
+                <div
+                    id="dashboardImportInformation"
+                    class="info-grid"
+                >
+                </div>
 
-}
+            </div>
 
 
-/* ==========================================================
-   TOAST
-========================================================== */
+            <!-- DISTRIBUTION -->
 
-function showToast(
-    message
-) {
+            <div class="card">
 
-    const toast =
-        document.getElementById(
-            "toast"
-        );
+                <div class="card-header">
 
+                    <div>
+                        <h3>Répartition par agent</h3>
+                        <p>
+                            Nombre de lignes actuellement affectées.
+                        </p>
+                    </div>
 
-    toast.textContent =
-        message;
+                </div>
 
 
-    toast.classList.add(
-        "show"
-    );
+                <div
+                    id="agentDistribution"
+                    class="agent-distribution"
+                >
+                </div>
 
+            </div>
 
-    clearTimeout(
-        toastTimer
-    );
+        </section>
 
 
-    toastTimer =
-        setTimeout(
-            () =>
-                toast.classList.remove(
-                    "show"
-                ),
-            2500
-        );
+        <!-- =================================================
+             IMPORT
+        ================================================== -->
 
-}
+        <section
+            id="import"
+            class="page"
+        >
 
+            <div class="card">
 
-/* ==========================================================
-   DATE
-========================================================== */
+                <div class="card-header">
 
-function renderDate() {
+                    <div>
+                        <h3>Importer un fichier Excel</h3>
+                        <p>
+                            Sélectionnez le fichier source contenant les
+                            informations CSP et les lignes clients.
+                        </p>
+                    </div>
 
-    document.getElementById(
-        "currentDate"
-    ).textContent =
-        new Date()
-            .toLocaleDateString(
-                "fr-FR",
-                {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric"
-                }
-            );
+                </div>
 
-}
 
+                <div
+                    id="dropZone"
+                    class="import-zone"
+                    onclick="openImportDialog()"
+                >
 
-/* ==========================================================
-   RENDER
-========================================================== */
+                    <div class="import-icon">
+                        ⇧
+                    </div>
 
-function renderAll() {
+                    <h3>
+                        Sélectionner un fichier Excel
+                    </h3>
 
-    updateCounters();
+                    <p>
+                        Formats acceptés : XLSX, XLS, XLSM
+                    </p>
 
-    renderDashboard();
+                    <button
+                        class="primary-btn"
+                        type="button"
+                    >
+                        Parcourir
+                    </button>
 
-    renderPendingList();
+                </div>
 
-    renderHistory();
 
-}
+                <input
+                    id="excelInput"
+                    type="file"
+                    accept=".xlsx,.xls,.xlsm"
+                    hidden
+                >
 
+            </div>
 
-/* ==========================================================
-   EVENTS
-========================================================== */
 
-pendingSearch.addEventListener(
-    "input",
-    renderPendingList
-);
+            <!-- IMPORT RESULT -->
 
+            <div
+                id="importResult"
+                class="hidden"
+            >
 
-historySearch.addEventListener(
-    "input",
-    renderHistory
-);
+                <div class="card">
 
+                    <div class="card-header">
 
-/* ==========================================================
-   START
-========================================================== */
+                        <div>
+                            <h3>Fichier importé</h3>
+                            <p id="importFileName">—</p>
+                        </div>
 
-async function startApplication() {
+                        <span class="status success-status">
+                            Importé
+                        </span>
 
-    initializeAgent();
+                    </div>
 
-    renderDate();
 
-    renderAll();
+                    <div
+                        id="sourceInformation"
+                        class="info-grid"
+                    >
+                    </div>
 
+                </div>
 
-    await loadManagerAssignments();
 
-}
+                <div class="card">
 
+                    <div class="card-header">
 
-startApplication();
+                        <div>
+                            <h3>Lignes détectées</h3>
+                            <p>
+                                Vérifiez les données avant l'affectation.
+                            </p>
+                        </div>
+
+
+                        <span
+                            id="importedRowsCount"
+                            class="pill"
+                        >
+                            0 ligne
+                        </span>
+
+                    </div>
+
+
+                    <div class="table-wrapper">
+
+                        <table>
+
+                            <thead>
+
+                            <tr>
+                                <th>SIRET</th>
+                                <th>Raison sociale</th>
+                                <th>Type</th>
+                                <th>N° Abonné</th>
+                                <th>Identifiant</th>
+                                <th>Contrat BAD</th>
+                                <th>Date limite</th>
+                            </tr>
+
+                            </thead>
+
+
+                            <tbody id="importPreviewTable">
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+
+                    <div class="card-footer">
+
+                        <button
+                            class="primary-btn"
+                            onclick="goToAssignments()"
+                        >
+                            Passer aux affectations →
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             ASSIGNMENTS
+        ================================================== -->
+
+        <section
+            id="assignments"
+            class="page"
+        >
+
+            <div class="card">
+
+                <div class="card-header assignment-header">
+
+                    <div>
+
+                        <h3>Affectation des lignes</h3>
+
+                        <p>
+                            Sélectionnez un agent pour chaque ligne importée.
+                        </p>
+
+                    </div>
+
+
+                    <div class="assignment-actions">
+
+                        <select id="bulkAgentSelect">
+                            <option value="">
+                                Affectation en masse...
+                            </option>
+                        </select>
+
+
+                        <button
+                            class="secondary-btn"
+                            onclick="assignAllToSelectedAgent()"
+                        >
+                            Affecter
+                        </button>
+
+
+                        <button
+                            id="validateAssignmentsButton"
+                            class="primary-btn"
+                            onclick="validateAssignments()"
+                        >
+                            ✓ Valider les affectations
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="assignment-toolbar">
+
+                    <input
+                        id="assignmentSearch"
+                        type="search"
+                        placeholder="Rechercher SIRET ou raison sociale..."
+                    >
+
+
+                    <select id="assignmentFilter">
+
+                        <option value="all">
+                            Toutes les lignes
+                        </option>
+
+                        <option value="unassigned">
+                            Non affectées
+                        </option>
+
+                        <option value="assigned">
+                            Affectées
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>
+                                <input
+                                    id="selectAllLines"
+                                    type="checkbox"
+                                >
+                            </th>
+
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>Date limite</th>
+                            <th>Agent</th>
+                            <th>Statut</th>
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="assignmentTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             AGENTS
+        ================================================== -->
+
+        <section
+            id="agents"
+            class="page"
+        >
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+                        <h3>Agents</h3>
+                        <p>
+                            Gérez les agents disponibles pour les affectations.
+                        </p>
+                    </div>
+
+
+                    <button
+                        class="primary-btn"
+                        onclick="showAddAgentForm()"
+                    >
+                        + Ajouter un agent
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="addAgentForm"
+                    class="add-agent-form hidden"
+                >
+
+                    <div class="form-field">
+
+                        <label for="newAgentId">
+                            Identifiant
+                        </label>
+
+                        <input
+                            id="newAgentId"
+                            type="text"
+                            placeholder="Ex : HAMDANMO"
+                        >
+
+                    </div>
+
+
+                    <div class="form-field">
+
+                        <label for="newAgentName">
+                            Nom affiché
+                        </label>
+
+                        <input
+                            id="newAgentName"
+                            type="text"
+                            placeholder="Ex : Mohamed Hamdan"
+                        >
+
+                    </div>
+
+
+                    <button
+                        class="primary-btn"
+                        onclick="addAgent()"
+                    >
+                        Ajouter
+                    </button>
+
+
+                    <button
+                        class="secondary-btn"
+                        onclick="hideAddAgentForm()"
+                    >
+                        Annuler
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="agentsList"
+                    class="agents-grid"
+                >
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- =========================================================
+     TOAST
+========================================================== -->
+
+<div
+    id="toast"
+    class="toast"
+>
+</div>
+
+
+<!-- =========================================================
+     SHEETJS
+========================================================== -->
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script src="js/manager.js"></script>
+
+</body>
+
+</html>
