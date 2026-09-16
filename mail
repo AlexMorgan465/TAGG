@@ -1,13 +1,1 @@
-(async () => {
-    try {
-        const folder = await window.showDirectoryPicker({
-            mode: "readwrite"
-        });
-
-        alert("OK : " + folder.name);
-        console.log("SUCCES", folder);
-    } catch (e) {
-        alert(e.name + "\n" + e.message);
-        console.error(e);
-    }
-})();
+window.showDirectoryPicker().then(x => alert("SUCCÈS : " + x.name)).catch(e => alert(e.name + " : " + e.message))
