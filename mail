@@ -1,749 +1,1947 @@
-<!DOCTYPE html>
-<html lang="fr">
+/* ==========================================================
+   AGENT ID FROM URL
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   Example:
+   agent.html?agent=HAMDANMO
+========================================================== */
 
-    <title>Espace Agent</title>
-
-    <link rel="stylesheet" href="css/agent.css">
-</head>
-
-<body>
-
-<div class="app">
-
-    <!-- ==================================================
-         SIDEBAR
-    =================================================== -->
-
-    <aside class="sidebar">
-
-        <div class="brand">
-
-            <div class="brand-logo">
-                GT
-            </div>
-
-            <div class="brand-text">
-                <strong>Gestion Traitement</strong>
-                <span>Espace Agent</span>
-            </div>
-
-        </div>
+const params =
+    new URLSearchParams(
+        window.location.search
+    );
 
 
-        <nav class="navigation">
+const AGENT_ID =
+    (
+        params.get("agent")
+        ||
+        "HAMDANMO"
+    )
+    .trim()
+    .toUpperCase();
 
-            <button
-                class="nav-btn active"
-                data-page="dashboard"
-            >
-                <span class="nav-icon">▦</span>
-                <span>Tableau de bord</span>
-            </button>
+
+const AGENT = {
+
+    id: AGENT_ID,
+
+    name: AGENT_ID
+
+};
 
 
-            <button
-                class="nav-btn"
-                data-page="pending"
-            >
-                <span class="nav-icon">☷</span>
-                <span>À traiter</span>
+/* ==========================================================
+   MANAGER DATA
 
-                <span
-                    id="navPendingCount"
-                    class="nav-count"
+   This variable will be populated by:
+   data/agents/HAMDANMO.js
+========================================================== */
+
+window.AGENT_DATA = null;
+
+
+/* ==========================================================
+   LOCAL STORAGE
+========================================================== */
+
+const STORAGE_KEY =
+    `gestion_traitement_agent_${AGENT.id}`;
+
+
+function defaultState() {
+
+    return {
+
+        assignments: [],
+
+        completed: [],
+
+        activeTreatmentId: null
+
+    };
+
+}
+
+
+function loadState() {
+
+    const saved =
+        localStorage.getItem(
+            STORAGE_KEY
+        );
+
+
+    if (!saved) {
+
+        return defaultState();
+
+    }
+
+
+    try {
+
+        return JSON.parse(
+            saved
+        );
+
+    }
+    catch {
+
+        return defaultState();
+
+    }
+
+}
+
+
+let state =
+    loadState();
+
+
+function saveState() {
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(state)
+    );
+
+}
+
+
+/* ==========================================================
+   VARIABLES
+========================================================== */
+
+let selectedLineId =
+    null;
+
+
+let toastTimer;
+
+
+/* ==========================================================
+   ELEMENTS
+========================================================== */
+
+const pendingList =
+    document.getElementById(
+        "pendingList"
+    );
+
+
+const dashboardTable =
+    document.getElementById(
+        "dashboardTable"
+    );
+
+
+const historyTable =
+    document.getElementById(
+        "historyTable"
+    );
+
+
+const emptySelection =
+    document.getElementById(
+        "emptySelection"
+    );
+
+
+const selectedDetails =
+    document.getElementById(
+        "selectedDetails"
+    );
+
+
+const treatmentForm =
+    document.getElementById(
+        "treatmentForm"
+    );
+
+
+const takeButton =
+    document.getElementById(
+        "takeButton"
+    );
+
+
+const pendingSearch =
+    document.getElementById(
+        "pendingSearch"
+    );
+
+
+const historySearch =
+    document.getElementById(
+        "historySearch"
+    );
+
+
+/* ==========================================================
+   LOAD MANAGER DATA FILE
+========================================================== */
+
+function loadManagerAssignments() {
+
+    return new Promise(
+        resolve => {
+
+            window.AGENT_DATA =
+                null;
+
+
+            /*
+                Remove previous data script.
+            */
+
+            const previous =
+                document.getElementById(
+                    "agentDataScript"
+                );
+
+
+            if (previous) {
+
+                previous.remove();
+
+            }
+
+
+            const script =
+                document.createElement(
+                    "script"
+                );
+
+
+            script.id =
+                "agentDataScript";
+
+
+            /*
+                Timestamp prevents browser caching.
+            */
+
+            script.src =
+                `data/agents/${encodeURIComponent(AGENT.id)}.js?t=${Date.now()}`;
+
+
+            script.onload =
+                () => {
+
+                    if (
+                        window.AGENT_DATA
+                    ) {
+
+                        if (
+                            window.AGENT_DATA.agentName
+                        ) {
+
+                            AGENT.name =
+                                window.AGENT_DATA.agentName;
+
+                        }
+
+
+                        mergeManagerAssignments(
+                            window.AGENT_DATA.assignments || []
+                        );
+
+                    }
+
+
+                    resolve(true);
+
+                };
+
+
+            script.onerror =
+                () => {
+
+                    console.warn(
+                        `Aucun fichier d'affectation pour ${AGENT.id}.`
+                    );
+
+
+                    /*
+                        Do NOT delete local work just because
+                        Manager file couldn't be read.
+                    */
+
+                    renderAll();
+
+                    resolve(false);
+
+                };
+
+
+            document.body.appendChild(
+                script
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   MERGE MANAGER DATA
+========================================================== */
+
+function mergeManagerAssignments(
+    managerAssignments
+) {
+
+    const completedIds =
+        new Set(
+            state.completed.map(
+                item => item.id
+            )
+        );
+
+
+    const existingMap =
+        new Map(
+            state.assignments.map(
+                item => [
+                    item.id,
+                    item
+                ]
+            )
+        );
+
+
+    const merged =
+        [];
+
+
+    managerAssignments.forEach(
+        managerItem => {
+
+            /*
+                Never recreate a locally completed line.
+            */
+
+            if (
+                completedIds.has(
+                    managerItem.id
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            const existing =
+                existingMap.get(
+                    managerItem.id
+                );
+
+
+            /*
+                Preserve an active treatment.
+            */
+
+            if (
+                existing &&
+                existing.status ===
+                    "processing"
+            ) {
+
+                merged.push(
+                    existing
+                );
+
+                return;
+
+            }
+
+
+            merged.push({
+
+                ...managerItem,
+
+                status:
+                    "pending"
+
+            });
+
+        }
+    );
+
+
+    /*
+        If an active treatment was removed from
+        Manager while the agent was working on it,
+        preserve it until the agent finishes/cancels.
+    */
+
+    if (
+        state.activeTreatmentId
+    ) {
+
+        const activeExisting =
+            existingMap.get(
+                state.activeTreatmentId
+            );
+
+
+        const alreadyIncluded =
+            merged.some(
+                item =>
+                    item.id ===
+                    state.activeTreatmentId
+            );
+
+
+        if (
+            activeExisting &&
+            !alreadyIncluded
+        ) {
+
+            merged.push(
+                activeExisting
+            );
+
+        }
+
+    }
+
+
+    state.assignments =
+        merged;
+
+
+    saveState();
+
+    initializeAgent();
+
+    renderAll();
+
+}
+
+
+/* ==========================================================
+   REFRESH
+========================================================== */
+
+async function refreshAssignments() {
+
+    const loaded =
+        await loadManagerAssignments();
+
+
+    if (loaded) {
+
+        showToast(
+            "Affectations actualisées."
+        );
+
+    }
+    else {
+
+        showToast(
+            "Aucune nouvelle affectation disponible."
+        );
+
+    }
+
+}
+
+
+/* ==========================================================
+   AGENT UI
+========================================================== */
+
+function initializeAgent() {
+
+    const initials =
+        getInitials(
+            AGENT.name
+        );
+
+
+    document.getElementById(
+        "agentName"
+    ).textContent =
+        AGENT.name;
+
+
+    document.getElementById(
+        "topAgentName"
+    ).textContent =
+        AGENT.name;
+
+
+    document.getElementById(
+        "welcomeAgent"
+    ).textContent =
+        AGENT.name;
+
+
+    document.getElementById(
+        "agentInitials"
+    ).textContent =
+        initials;
+
+
+    document.getElementById(
+        "topInitials"
+    ).textContent =
+        initials;
+
+}
+
+
+/* ==========================================================
+   NAVIGATION
+========================================================== */
+
+document
+    .querySelectorAll(
+        ".nav-btn"
+    )
+    .forEach(
+        button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    showPage(
+                        button.dataset.page
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+function showPage(
+    pageName
+) {
+
+    document
+        .querySelectorAll(
+            ".page"
+        )
+        .forEach(
+            page =>
+                page.classList.remove(
+                    "active"
+                )
+        );
+
+
+    document
+        .querySelectorAll(
+            ".nav-btn"
+        )
+        .forEach(
+            button =>
+                button.classList.remove(
+                    "active"
+                )
+        );
+
+
+    document
+        .getElementById(
+            pageName
+        )
+        .classList.add(
+            "active"
+        );
+
+
+    document
+        .querySelector(
+            `[data-page="${pageName}"]`
+        )
+        .classList.add(
+            "active"
+        );
+
+
+    const titles = {
+
+        dashboard: [
+            "Tableau de bord",
+            "Suivez et traitez vos lignes affectées."
+        ],
+
+        pending: [
+            "À traiter",
+            "Consultez vos lignes affectées."
+        ],
+
+        history: [
+            "Historique",
+            "Consultez vos traitements terminés."
+        ]
+
+    };
+
+
+    document.getElementById(
+        "pageTitle"
+    ).textContent =
+        titles[pageName][0];
+
+
+    document.getElementById(
+        "pageSubtitle"
+    ).textContent =
+        titles[pageName][1];
+
+
+    if (
+        pageName ===
+        "history"
+    ) {
+
+        renderHistory();
+
+    }
+
+}
+
+
+function openPendingPage() {
+
+    showPage(
+        "pending"
+    );
+
+}
+
+
+/* ==========================================================
+   PENDING
+========================================================== */
+
+function getPendingAssignments() {
+
+    return state.assignments.filter(
+        item =>
+
+            item.status ===
+                "pending"
+
+            ||
+
+            item.status ===
+                "processing"
+    );
+
+}
+
+
+/* ==========================================================
+   COUNTERS
+========================================================== */
+
+function updateCounters() {
+
+    const pending =
+        state.assignments.filter(
+            item =>
+                item.status ===
+                "pending"
+        ).length;
+
+
+    const processing =
+        state.assignments.filter(
+            item =>
+                item.status ===
+                "processing"
+        ).length;
+
+
+    const completed =
+        state.completed.length;
+
+
+    document.getElementById(
+        "pendingCount"
+    ).textContent =
+        pending;
+
+
+    document.getElementById(
+        "processingCount"
+    ).textContent =
+        processing;
+
+
+    document.getElementById(
+        "completedCount"
+    ).textContent =
+        completed;
+
+
+    document.getElementById(
+        "navPendingCount"
+    ).textContent =
+        pending;
+
+
+    document.getElementById(
+        "queueCount"
+    ).textContent =
+        pending + processing;
+
+}
+
+
+/* ==========================================================
+   DASHBOARD
+========================================================== */
+
+function renderDashboard() {
+
+    dashboardTable.innerHTML =
+        "";
+
+
+    const rows =
+        getPendingAssignments()
+            .slice(
+                0,
+                5
+            );
+
+
+    if (
+        rows.length === 0
+    ) {
+
+        dashboardTable.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="5"
+                    style="
+                        text-align:center;
+                        padding:30px;
+                        color:#9ca3af;
+                    "
                 >
-                    0
-                </span>
-            </button>
+                    Aucune ligne à traiter.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+
+    }
 
 
-            <button
-                class="nav-btn"
-                data-page="history"
-            >
-                <span class="nav-icon">◷</span>
-                <span>Historique</span>
-            </button>
+    rows.forEach(
+        item => {
 
-        </nav>
+            dashboardTable.insertAdjacentHTML(
+                "beforeend",
+                `
 
+                <tr>
 
-        <div class="agent-profile">
+                    <td>
+                        ${escapeHTML(item.line.siret)}
+                    </td>
 
-            <div
-                class="avatar"
-                id="agentInitials"
-            >
-                --
-            </div>
-
-            <div class="agent-profile-text">
-
-                <strong id="agentName">
-                    Agent
-                </strong>
-
-                <span>Agent</span>
-
-            </div>
-
-        </div>
-
-    </aside>
-
-
-    <!-- ==================================================
-         MAIN
-    =================================================== -->
-
-    <main class="main">
-
-        <!-- TOPBAR -->
-
-        <header class="topbar">
-
-            <div>
-
-                <h1 id="pageTitle">
-                    Tableau de bord
-                </h1>
-
-                <p id="pageSubtitle">
-                    Suivez et traitez vos lignes affectées.
-                </p>
-
-            </div>
-
-
-            <div class="topbar-right">
-
-                <button
-                    class="primary-btn"
-                    onclick="refreshAssignments()"
-                >
-                    ↻ Actualiser
-                </button>
-
-
-                <div
-                    class="date-box"
-                    id="currentDate"
-                >
-                </div>
-
-
-                <div class="agent-mini">
-
-                    <div
-                        class="mini-avatar"
-                        id="topInitials"
-                    >
-                        --
-                    </div>
-
-                    <div>
-
-                        <strong id="topAgentName">
-                            Agent
+                    <td>
+                        <strong>
+                            ${escapeHTML(item.line.raisonSociale)}
                         </strong>
+                    </td>
 
-                        <span>Agent</span>
+                    <td>
+                        ${escapeHTML(item.line.typeFacture || "—")}
+                    </td>
 
-                    </div>
+                    <td>
+                        ${escapeHTML(item.line.dateLimite || "—")}
+                    </td>
 
-                </div>
+                    <td>
 
-            </div>
+                        ${
+                            item.status ===
+                            "processing"
 
-        </header>
-
-
-        <!-- ==================================================
-             DASHBOARD
-        =================================================== -->
-
-        <section
-            id="dashboard"
-            class="page active"
-        >
-
-            <div class="welcome">
-
-                <div>
-
-                    <span class="eyebrow">
-                        ESPACE AGENT
-                    </span>
-
-                    <h2>
-                        Bonjour,
-                        <span id="welcomeAgent">
-                            Agent
-                        </span>
-                    </h2>
-
-                    <p>
-                        Voici l'état de vos traitements.
-                    </p>
-
-                </div>
-
-
-                <button
-                    class="primary-btn"
-                    onclick="openPendingPage()"
-                >
-                    Commencer le traitement →
-                </button>
-
-            </div>
-
-
-            <div class="stats">
-
-                <article class="stat-card">
-
-                    <div class="stat-icon warning-icon">
-                        ☷
-                    </div>
-
-                    <div>
-                        <span>À traiter</span>
-                        <strong id="pendingCount">0</strong>
-                    </div>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <div class="stat-icon active-icon">
-                        ↻
-                    </div>
-
-                    <div>
-                        <span>En cours</span>
-                        <strong id="processingCount">0</strong>
-                    </div>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <div class="stat-icon success-icon">
-                        ✓
-                    </div>
-
-                    <div>
-                        <span>Terminées</span>
-                        <strong id="completedCount">0</strong>
-                    </div>
-
-                </article>
-
-            </div>
-
-
-            <div class="card">
-
-                <div class="card-header">
-
-                    <div>
-
-                        <h3>
-                            Prochaines lignes à traiter
-                        </h3>
-
-                        <p>
-                            Vos dernières lignes affectées.
-                        </p>
-
-                    </div>
-
-
-                    <button
-                        class="text-btn"
-                        onclick="openPendingPage()"
-                    >
-                        Voir toutes →
-                    </button>
-
-                </div>
-
-
-                <div class="table-wrapper">
-
-                    <table>
-
-                        <thead>
-
-                        <tr>
-                            <th>SIRET</th>
-                            <th>Raison sociale</th>
-                            <th>Type facture</th>
-                            <th>Date limite</th>
-                            <th>Statut</th>
-                        </tr>
-
-                        </thead>
-
-
-                        <tbody id="dashboardTable">
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- ==================================================
-             A TRAITER
-        =================================================== -->
-
-        <section
-            id="pending"
-            class="page"
-        >
-
-            <div class="workspace">
-
-
-                <!-- LISTE -->
-
-                <div class="card queue-card">
-
-                    <div class="card-header">
-
-                        <div>
-
-                            <h3>
-                                Lignes à traiter
-                            </h3>
-
-                            <p>
-                                Sélectionnez une ligne.
-                            </p>
-
-                        </div>
-
-
-                        <span
-                            id="queueCount"
-                            class="pill"
-                        >
-                            0
-                        </span>
-
-                    </div>
-
-
-                    <div class="queue-search">
-
-                        <input
-                            id="pendingSearch"
-                            type="search"
-                            placeholder="Rechercher SIRET ou raison sociale..."
-                        >
-
-                    </div>
-
-
-                    <div
-                        id="pendingList"
-                        class="pending-list"
-                    >
-                    </div>
-
-                </div>
-
-
-                <!-- DETAILS -->
-
-                <div class="details-column">
-
-
-                    <div
-                        id="emptySelection"
-                        class="card empty-state"
-                    >
-
-                        <div class="empty-state-icon">
-                            ☷
-                        </div>
-
-                        <h3>
-                            Sélectionnez une ligne
-                        </h3>
-
-                        <p>
-                            Les informations nécessaires
-                            apparaîtront ici.
-                        </p>
-
-                    </div>
-
-
-                    <div
-                        id="selectedDetails"
-                        class="hidden"
-                    >
-
-
-                        <div class="selected-client">
-
-                            <div>
-
-                                <span class="eyebrow">
-                                    LIGNE SÉLECTIONNÉE
-                                </span>
-
-                                <h2 id="selectedCompany">
-                                    —
-                                </h2>
-
-                                <span
-                                    id="selectedSiret"
-                                    class="selected-siret"
-                                >
-                                    —
-                                </span>
-
-                            </div>
-
-
-                            <span class="status pending-status">
-                                À traiter
-                            </span>
-
-                        </div>
-
-
-                        <!-- SOURCE -->
-
-                        <div class="card">
-
-                            <div class="section-heading">
-
-                                <div class="heading-icon">
-                                    ⌁
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Informations fichier source
-                                    </h3>
-
-                                    <p>
-                                        Informations communes du fichier Manager.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <div
-                                id="sourceInformation"
-                                class="info-grid"
-                            >
-                            </div>
-
-                        </div>
-
-
-                        <!-- LINE -->
-
-                        <div class="card">
-
-                            <div class="section-heading">
-
-                                <div class="heading-icon">
-                                    ≡
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Informations de la ligne
-                                    </h3>
-
-                                    <p>
-                                        Informations propres au client.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <div
-                                id="lineInformation"
-                                class="info-grid"
-                            >
-                            </div>
-
-                        </div>
-
-
-                        <button
-                            id="takeButton"
-                            class="take-button"
-                            onclick="takeSelectedLine()"
-                        >
-                            Prendre en charge
-                        </button>
-
-
-                        <!-- FORM -->
-
-                        <div
-                            id="treatmentForm"
-                            class="card treatment-card hidden"
-                        >
-
-                            <div class="treatment-header">
-
-                                <div>
-
-                                    <span class="processing-dot">
-                                    </span>
-
-                                    <div>
-
-                                        <h3>
-                                            Traitement en cours
-                                        </h3>
-
-                                        <p>
-                                            Complétez les informations.
-                                        </p>
-
-                                    </div>
-
-                                </div>
-
-
+                            ? `
                                 <span class="status processing-status">
                                     En cours
                                 </span>
+                              `
 
-                            </div>
+                            : `
+                                <span class="status pending-status">
+                                    À traiter
+                                </span>
+                              `
+                        }
 
+                    </td>
 
-                            <div class="form-grid">
+                </tr>
 
+                `
+            );
 
-                                <div class="form-field">
+        }
+    );
 
-                                    <label for="subscriberNumber">
-                                        N° Abonné
-                                    </label>
-
-                                    <input
-                                        id="subscriberNumber"
-                                        type="text"
-                                    >
-
-                                </div>
-
-
-                                <div class="form-field">
-
-                                    <label for="idt">
-                                        IDT
-                                    </label>
-
-                                    <input
-                                        id="idt"
-                                        type="text"
-                                    >
-
-                                </div>
+}
 
 
-                                <div class="form-field">
+/* ==========================================================
+   PENDING LIST
+========================================================== */
 
-                                    <label for="password">
-                                        MDP
-                                    </label>
+function renderPendingList() {
 
-                                    <input
-                                        id="password"
-                                        type="text"
-                                    >
-
-                                </div>
+    pendingList.innerHTML =
+        "";
 
 
-                                <div class="form-field">
-
-                                    <label for="badContract">
-                                        Contrat BAD
-                                    </label>
-
-                                    <input
-                                        id="badContract"
-                                        type="text"
-                                    >
-
-                                </div>
+    const search =
+        pendingSearch.value
+            .trim()
+            .toLowerCase();
 
 
-                                <div class="form-field">
+    const items =
+        getPendingAssignments()
+            .filter(
+                item => {
 
-                                    <label for="csp">
-                                        CSP
-                                    </label>
+                    return (
 
-                                    <input
-                                        id="csp"
-                                        type="text"
-                                    >
+                        item.line.siret
+                            .toLowerCase()
+                            .includes(
+                                search
+                            )
 
-                                </div>
+                        ||
 
+                        item.line.raisonSociale
+                            .toLowerCase()
+                            .includes(
+                                search
+                            )
 
-                                <div class="form-field full-width">
+                    );
 
-                                    <label for="comment">
-                                        Commentaire
-                                    </label>
-
-                                    <textarea
-                                        id="comment"
-                                    ></textarea>
-
-                                </div>
-
-                            </div>
+                }
+            );
 
 
-                            <div class="form-actions">
+    if (
+        items.length === 0
+    ) {
 
-                                <button
-                                    class="secondary-btn"
-                                    onclick="cancelTreatment()"
-                                >
-                                    Annuler
-                                </button>
+        pendingList.innerHTML = `
 
-
-                                <button
-                                    class="complete-btn"
-                                    onclick="completeTreatment()"
-                                >
-                                    ✓ Terminer
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
+            <div style="
+                text-align:center;
+                padding:35px;
+                color:#9ca3af;
+                font-size:11px;
+            ">
+                Aucune ligne à traiter.
             </div>
 
-        </section>
+        `;
+
+        return;
+
+    }
 
 
-        <!-- ==================================================
-             HISTORY
-        =================================================== -->
+    items.forEach(
+        item => {
 
-        <section
-            id="history"
-            class="page"
-        >
-
-            <div class="card">
-
-                <div class="card-header history-header">
-
-                    <div>
-
-                        <h3>
-                            Historique des traitements
-                        </h3>
-
-                        <p>
-                            Lignes terminées par cet agent.
-                        </p>
-
-                    </div>
+            const element =
+                document.createElement(
+                    "div"
+                );
 
 
-                    <input
-                        id="historySearch"
-                        class="history-search"
-                        type="search"
-                        placeholder="Rechercher..."
-                    >
+            element.className =
+                "pending-item";
+
+
+            if (
+                selectedLineId ===
+                item.id
+            ) {
+
+                element.classList.add(
+                    "selected"
+                );
+
+            }
+
+
+            element.innerHTML = `
+
+                <div class="pending-item-top">
+
+                    <span class="pending-company">
+
+                        ${escapeHTML(
+                            item.line.raisonSociale
+                        )}
+
+                    </span>
+
+
+                    ${
+                        item.status ===
+                        "processing"
+
+                        ? `
+                            <span class="status processing-status">
+                                En cours
+                            </span>
+                          `
+
+                        : `
+                            <span class="status pending-status">
+                                À traiter
+                            </span>
+                          `
+                    }
 
                 </div>
 
 
-                <div class="table-wrapper">
+                <div class="pending-siret">
 
-                    <table>
-
-                        <thead>
-
-                        <tr>
-                            <th>SIRET</th>
-                            <th>Raison sociale</th>
-                            <th>Type</th>
-                            <th>N° Abonné</th>
-                            <th>IDT</th>
-                            <th>Contrat BAD</th>
-                            <th>Terminé le</th>
-                        </tr>
-
-                        </thead>
-
-
-                        <tbody id="historyTable">
-                        </tbody>
-
-                    </table>
+                    SIRET :
+                    ${escapeHTML(
+                        item.line.siret
+                    )}
 
                 </div>
 
-            </div>
 
-        </section>
+                <div class="pending-meta">
 
-    </main>
+                    <span>
+                        Facture :
+                        ${escapeHTML(
+                            item.line.typeFacture || "—"
+                        )}
+                    </span>
 
-</div>
+                    <span>
+                        ${escapeHTML(
+                            item.line.dateLimite || "—"
+                        )}
+                    </span>
+
+                </div>
+
+            `;
 
 
-<div
-    id="toast"
-    class="toast"
->
-</div>
+            element.addEventListener(
+                "click",
+                () => {
+
+                    selectLine(
+                        item.id
+                    );
+
+                }
+            );
 
 
-<!--
-    IMPORTANT:
-    agent-loader.js is generated dynamically below
-    according to ?agent=HAMDANMO
--->
+            pendingList.appendChild(
+                element
+            );
 
-<script src="js/agent.js"></script>
+        }
+    );
 
-</body>
+}
 
-</html>
+
+/* ==========================================================
+   SELECT
+========================================================== */
+
+function selectLine(
+    id
+) {
+
+    const item =
+        state.assignments.find(
+            row =>
+                row.id === id
+        );
+
+
+    if (!item) {
+        return;
+    }
+
+
+    if (
+        state.activeTreatmentId &&
+        state.activeTreatmentId !== id
+    ) {
+
+        showToast(
+            "Une autre ligne est déjà en cours."
+        );
+
+        return;
+
+    }
+
+
+    selectedLineId =
+        id;
+
+
+    renderPendingList();
+
+    displaySelectedLine(
+        item
+    );
+
+}
+
+
+/* ==========================================================
+   DETAILS
+========================================================== */
+
+function displaySelectedLine(
+    item
+) {
+
+    emptySelection.classList.add(
+        "hidden"
+    );
+
+
+    selectedDetails.classList.remove(
+        "hidden"
+    );
+
+
+    document.getElementById(
+        "selectedCompany"
+    ).textContent =
+        item.line.raisonSociale;
+
+
+    document.getElementById(
+        "selectedSiret"
+    ).textContent =
+        `SIRET : ${item.line.siret}`;
+
+
+    renderInformation(
+
+        document.getElementById(
+            "sourceInformation"
+        ),
+
+        [
+
+            [
+                "Nom CSP",
+                item.source?.nomCSP
+            ],
+
+            [
+                "Contrat BAD",
+                item.source?.contratBAD
+            ],
+
+            [
+                "IDT Connexion",
+                item.source?.idtConnexion
+            ],
+
+            [
+                "MDP CSP",
+                item.source?.mdpCSP
+            ],
+
+            [
+                "N° Abonné CSP",
+                item.source?.numeroAbonneCSP
+            ],
+
+            [
+                "IBAN",
+                item.source?.iban
+            ]
+
+        ]
+
+    );
+
+
+    renderInformation(
+
+        document.getElementById(
+            "lineInformation"
+        ),
+
+        [
+
+            [
+                "Raison sociale",
+                item.line.raisonSociale
+            ],
+
+            [
+                "SIRET",
+                item.line.siret
+            ],
+
+            [
+                "Type facture",
+                item.line.typeFacture
+            ],
+
+            [
+                "Date limite",
+                item.line.dateLimite
+            ]
+
+        ]
+
+    );
+
+
+    if (
+        item.status ===
+        "processing"
+    ) {
+
+        takeButton.classList.add(
+            "hidden"
+        );
+
+
+        treatmentForm.classList.remove(
+            "hidden"
+        );
+
+    }
+    else {
+
+        takeButton.classList.remove(
+            "hidden"
+        );
+
+
+        treatmentForm.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+/* ==========================================================
+   INFORMATION CARDS
+========================================================== */
+
+function renderInformation(
+    container,
+    information
+) {
+
+    container.innerHTML =
+        "";
+
+
+    information.forEach(
+        ([label, value]) => {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "info-item";
+
+
+            const labelElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            labelElement.className =
+                "info-label";
+
+
+            labelElement.textContent =
+                label;
+
+
+            const valueElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            valueElement.className =
+                "info-value";
+
+
+            valueElement.textContent =
+                value || "—";
+
+
+            const copyButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            copyButton.className =
+                "copy-button";
+
+
+            copyButton.textContent =
+                "⧉";
+
+
+            copyButton.addEventListener(
+                "click",
+                event => {
+
+                    event.stopPropagation();
+
+                    copyValue(
+                        value || ""
+                    );
+
+                }
+            );
+
+
+            item.append(
+                labelElement,
+                valueElement,
+                copyButton
+            );
+
+
+            container.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   TAKE
+========================================================== */
+
+function takeSelectedLine() {
+
+    if (!selectedLineId) {
+        return;
+    }
+
+
+    if (
+        state.activeTreatmentId &&
+        state.activeTreatmentId !==
+            selectedLineId
+    ) {
+
+        showToast(
+            "Une autre ligne est déjà en cours."
+        );
+
+        return;
+
+    }
+
+
+    const item =
+        state.assignments.find(
+            row =>
+                row.id ===
+                selectedLineId
+        );
+
+
+    if (!item) {
+        return;
+    }
+
+
+    item.status =
+        "processing";
+
+
+    state.activeTreatmentId =
+        item.id;
+
+
+    /*
+        Prefill with any existing line-level values first.
+        Otherwise use CSP source values.
+    */
+
+    document.getElementById(
+        "subscriberNumber"
+    ).value =
+        item.line.numeroAbonne ||
+        item.source?.numeroAbonneCSP ||
+        "";
+
+
+    document.getElementById(
+        "idt"
+    ).value =
+        item.line.identifiant ||
+        item.source?.idtConnexion ||
+        "";
+
+
+    document.getElementById(
+        "password"
+    ).value =
+        item.line.mdp ||
+        item.source?.mdpCSP ||
+        "";
+
+
+    document.getElementById(
+        "badContract"
+    ).value =
+        item.line.contratBAD ||
+        item.source?.contratBAD ||
+        "";
+
+
+    document.getElementById(
+        "csp"
+    ).value =
+        item.source?.nomCSP ||
+        "";
+
+
+    saveState();
+
+    renderAll();
+
+    displaySelectedLine(
+        item
+    );
+
+
+    showToast(
+        "Ligne prise en charge."
+    );
+
+}
+
+
+/* ==========================================================
+   CANCEL
+========================================================== */
+
+function cancelTreatment() {
+
+    const item =
+        state.assignments.find(
+            row =>
+                row.id ===
+                state.activeTreatmentId
+        );
+
+
+    if (!item) {
+        return;
+    }
+
+
+    item.status =
+        "pending";
+
+
+    state.activeTreatmentId =
+        null;
+
+
+    clearForm();
+
+    saveState();
+
+    renderAll();
+
+    displaySelectedLine(
+        item
+    );
+
+
+    showToast(
+        "Traitement annulé."
+    );
+
+}
+
+
+/* ==========================================================
+   COMPLETE
+========================================================== */
+
+function completeTreatment() {
+
+    if (
+        !state.activeTreatmentId
+    ) {
+
+        return;
+
+    }
+
+
+    const treatment = {
+
+        numeroAbonne:
+            getValue(
+                "subscriberNumber"
+            ),
+
+        idt:
+            getValue(
+                "idt"
+            ),
+
+        mdp:
+            getValue(
+                "password"
+            ),
+
+        contratBAD:
+            getValue(
+                "badContract"
+            ),
+
+        csp:
+            getValue(
+                "csp"
+            ),
+
+        commentaire:
+            getValue(
+                "comment"
+            )
+
+    };
+
+
+    if (
+        !treatment.numeroAbonne ||
+        !treatment.idt ||
+        !treatment.mdp ||
+        !treatment.contratBAD ||
+        !treatment.csp
+    ) {
+
+        showToast(
+            "Complétez tous les champs obligatoires."
+        );
+
+        return;
+
+    }
+
+
+    const index =
+        state.assignments.findIndex(
+            row =>
+                row.id ===
+                state.activeTreatmentId
+        );
+
+
+    if (
+        index === -1
+    ) {
+        return;
+    }
+
+
+    const item =
+        state.assignments[index];
+
+
+    state.completed.unshift({
+
+        ...item,
+
+        status:
+            "completed",
+
+        treatment,
+
+        completedBy:
+            AGENT.name,
+
+        completedAt:
+            new Date()
+                .toLocaleString(
+                    "fr-FR"
+                )
+
+    });
+
+
+    state.assignments.splice(
+        index,
+        1
+    );
+
+
+    state.activeTreatmentId =
+        null;
+
+
+    selectedLineId =
+        null;
+
+
+    saveState();
+
+    clearForm();
+
+    closeDetails();
+
+    renderAll();
+
+
+    showToast(
+        "Traitement terminé."
+    );
+
+}
+
+
+/* ==========================================================
+   HISTORY
+========================================================== */
+
+function renderHistory() {
+
+    historyTable.innerHTML =
+        "";
+
+
+    const search =
+        historySearch.value
+            .trim()
+            .toLowerCase();
+
+
+    const rows =
+        state.completed.filter(
+            item =>
+
+                item.line.siret
+                    .toLowerCase()
+                    .includes(
+                        search
+                    )
+
+                ||
+
+                item.line.raisonSociale
+                    .toLowerCase()
+                    .includes(
+                        search
+                    )
+        );
+
+
+    if (
+        rows.length === 0
+    ) {
+
+        historyTable.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="7"
+                    style="
+                        text-align:center;
+                        padding:35px;
+                        color:#9ca3af;
+                    "
+                >
+                    Aucun traitement terminé.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+
+    }
+
+
+    rows.forEach(
+        item => {
+
+            historyTable.insertAdjacentHTML(
+                "beforeend",
+                `
+
+                <tr>
+
+                    <td>
+                        ${escapeHTML(item.line.siret)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.line.raisonSociale)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.line.typeFacture || "—")}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.treatment.numeroAbonne)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.treatment.idt)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.treatment.contratBAD)}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.completedAt)}
+                    </td>
+
+                </tr>
+
+                `
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   HELPERS
+========================================================== */
+
+function getValue(
+    id
+) {
+
+    return document
+        .getElementById(id)
+        .value
+        .trim();
+
+}
+
+
+function clearForm() {
+
+    [
+        "subscriberNumber",
+        "idt",
+        "password",
+        "badContract",
+        "csp",
+        "comment"
+
+    ].forEach(
+        id => {
+
+            document.getElementById(
+                id
+            ).value =
+                "";
+
+        }
+    );
+
+}
+
+
+function closeDetails() {
+
+    selectedDetails.classList.add(
+        "hidden"
+    );
+
+
+    emptySelection.classList.remove(
+        "hidden"
+    );
+
+}
+
+
+async function copyValue(
+    value
+) {
+
+    try {
+
+        await navigator.clipboard.writeText(
+            value
+        );
+
+    }
+    catch {
+
+        const area =
+            document.createElement(
+                "textarea"
+            );
+
+
+        area.value =
+            value;
+
+
+        document.body.appendChild(
+            area
+        );
+
+
+        area.select();
+
+
+        document.execCommand(
+            "copy"
+        );
+
+
+        area.remove();
+
+    }
+
+
+    showToast(
+        "Copié."
+    );
+
+}
+
+
+function getInitials(
+    name
+) {
+
+    const words =
+        name
+            .trim()
+            .split(/\s+/);
+
+
+    if (
+        words.length === 1
+    ) {
+
+        return words[0]
+            .substring(
+                0,
+                2
+            )
+            .toUpperCase();
+
+    }
+
+
+    return (
+        words[0][0] +
+        words[
+            words.length - 1
+        ][0]
+    )
+    .toUpperCase();
+
+}
+
+
+function escapeHTML(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+    .replaceAll(
+        "&",
+        "&amp;"
+    )
+    .replaceAll(
+        "<",
+        "&lt;"
+    )
+    .replaceAll(
+        ">",
+        "&gt;"
+    )
+    .replaceAll(
+        '"',
+        "&quot;"
+    )
+    .replaceAll(
+        "'",
+        "&#039;"
+    );
+
+}
+
+
+/* ==========================================================
+   TOAST
+========================================================== */
+
+function showToast(
+    message
+) {
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+
+    toast.textContent =
+        message;
+
+
+    toast.classList.add(
+        "show"
+    );
+
+
+    clearTimeout(
+        toastTimer
+    );
+
+
+    toastTimer =
+        setTimeout(
+            () =>
+                toast.classList.remove(
+                    "show"
+                ),
+            2500
+        );
+
+}
+
+
+/* ==========================================================
+   DATE
+========================================================== */
+
+function renderDate() {
+
+    document.getElementById(
+        "currentDate"
+    ).textContent =
+        new Date()
+            .toLocaleDateString(
+                "fr-FR",
+                {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            );
+
+}
+
+
+/* ==========================================================
+   RENDER
+========================================================== */
+
+function renderAll() {
+
+    updateCounters();
+
+    renderDashboard();
+
+    renderPendingList();
+
+    renderHistory();
+
+}
+
+
+/* ==========================================================
+   EVENTS
+========================================================== */
+
+pendingSearch.addEventListener(
+    "input",
+    renderPendingList
+);
+
+
+historySearch.addEventListener(
+    "input",
+    renderHistory
+);
+
+
+/* ==========================================================
+   START
+========================================================== */
+
+async function startApplication() {
+
+    initializeAgent();
+
+    renderDate();
+
+    renderAll();
+
+
+    await loadManagerAssignments();
+
+}
+
+
+startApplication();
