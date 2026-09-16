@@ -1,2 +1,749 @@
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="js/manager.js"></script>
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Espace Agent</title>
+
+    <link rel="stylesheet" href="css/agent.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- ==================================================
+         SIDEBAR
+    =================================================== -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+
+            <div class="brand-logo">
+                GT
+            </div>
+
+            <div class="brand-text">
+                <strong>Gestion Traitement</strong>
+                <span>Espace Agent</span>
+            </div>
+
+        </div>
+
+
+        <nav class="navigation">
+
+            <button
+                class="nav-btn active"
+                data-page="dashboard"
+            >
+                <span class="nav-icon">▦</span>
+                <span>Tableau de bord</span>
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="pending"
+            >
+                <span class="nav-icon">☷</span>
+                <span>À traiter</span>
+
+                <span
+                    id="navPendingCount"
+                    class="nav-count"
+                >
+                    0
+                </span>
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="history"
+            >
+                <span class="nav-icon">◷</span>
+                <span>Historique</span>
+            </button>
+
+        </nav>
+
+
+        <div class="agent-profile">
+
+            <div
+                class="avatar"
+                id="agentInitials"
+            >
+                --
+            </div>
+
+            <div class="agent-profile-text">
+
+                <strong id="agentName">
+                    Agent
+                </strong>
+
+                <span>Agent</span>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <!-- ==================================================
+         MAIN
+    =================================================== -->
+
+    <main class="main">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <div>
+
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
+
+                <p id="pageSubtitle">
+                    Suivez et traitez vos lignes affectées.
+                </p>
+
+            </div>
+
+
+            <div class="topbar-right">
+
+                <button
+                    class="primary-btn"
+                    onclick="refreshAssignments()"
+                >
+                    ↻ Actualiser
+                </button>
+
+
+                <div
+                    class="date-box"
+                    id="currentDate"
+                >
+                </div>
+
+
+                <div class="agent-mini">
+
+                    <div
+                        class="mini-avatar"
+                        id="topInitials"
+                    >
+                        --
+                    </div>
+
+                    <div>
+
+                        <strong id="topAgentName">
+                            Agent
+                        </strong>
+
+                        <span>Agent</span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- ==================================================
+             DASHBOARD
+        =================================================== -->
+
+        <section
+            id="dashboard"
+            class="page active"
+        >
+
+            <div class="welcome">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ESPACE AGENT
+                    </span>
+
+                    <h2>
+                        Bonjour,
+                        <span id="welcomeAgent">
+                            Agent
+                        </span>
+                    </h2>
+
+                    <p>
+                        Voici l'état de vos traitements.
+                    </p>
+
+                </div>
+
+
+                <button
+                    class="primary-btn"
+                    onclick="openPendingPage()"
+                >
+                    Commencer le traitement →
+                </button>
+
+            </div>
+
+
+            <div class="stats">
+
+                <article class="stat-card">
+
+                    <div class="stat-icon warning-icon">
+                        ☷
+                    </div>
+
+                    <div>
+                        <span>À traiter</span>
+                        <strong id="pendingCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon active-icon">
+                        ↻
+                    </div>
+
+                    <div>
+                        <span>En cours</span>
+                        <strong id="processingCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon success-icon">
+                        ✓
+                    </div>
+
+                    <div>
+                        <span>Terminées</span>
+                        <strong id="completedCount">0</strong>
+                    </div>
+
+                </article>
+
+            </div>
+
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+
+                        <h3>
+                            Prochaines lignes à traiter
+                        </h3>
+
+                        <p>
+                            Vos dernières lignes affectées.
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        class="text-btn"
+                        onclick="openPendingPage()"
+                    >
+                        Voir toutes →
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type facture</th>
+                            <th>Date limite</th>
+                            <th>Statut</th>
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="dashboardTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ==================================================
+             A TRAITER
+        =================================================== -->
+
+        <section
+            id="pending"
+            class="page"
+        >
+
+            <div class="workspace">
+
+
+                <!-- LISTE -->
+
+                <div class="card queue-card">
+
+                    <div class="card-header">
+
+                        <div>
+
+                            <h3>
+                                Lignes à traiter
+                            </h3>
+
+                            <p>
+                                Sélectionnez une ligne.
+                            </p>
+
+                        </div>
+
+
+                        <span
+                            id="queueCount"
+                            class="pill"
+                        >
+                            0
+                        </span>
+
+                    </div>
+
+
+                    <div class="queue-search">
+
+                        <input
+                            id="pendingSearch"
+                            type="search"
+                            placeholder="Rechercher SIRET ou raison sociale..."
+                        >
+
+                    </div>
+
+
+                    <div
+                        id="pendingList"
+                        class="pending-list"
+                    >
+                    </div>
+
+                </div>
+
+
+                <!-- DETAILS -->
+
+                <div class="details-column">
+
+
+                    <div
+                        id="emptySelection"
+                        class="card empty-state"
+                    >
+
+                        <div class="empty-state-icon">
+                            ☷
+                        </div>
+
+                        <h3>
+                            Sélectionnez une ligne
+                        </h3>
+
+                        <p>
+                            Les informations nécessaires
+                            apparaîtront ici.
+                        </p>
+
+                    </div>
+
+
+                    <div
+                        id="selectedDetails"
+                        class="hidden"
+                    >
+
+
+                        <div class="selected-client">
+
+                            <div>
+
+                                <span class="eyebrow">
+                                    LIGNE SÉLECTIONNÉE
+                                </span>
+
+                                <h2 id="selectedCompany">
+                                    —
+                                </h2>
+
+                                <span
+                                    id="selectedSiret"
+                                    class="selected-siret"
+                                >
+                                    —
+                                </span>
+
+                            </div>
+
+
+                            <span class="status pending-status">
+                                À traiter
+                            </span>
+
+                        </div>
+
+
+                        <!-- SOURCE -->
+
+                        <div class="card">
+
+                            <div class="section-heading">
+
+                                <div class="heading-icon">
+                                    ⌁
+                                </div>
+
+                                <div>
+
+                                    <h3>
+                                        Informations fichier source
+                                    </h3>
+
+                                    <p>
+                                        Informations communes du fichier Manager.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="sourceInformation"
+                                class="info-grid"
+                            >
+                            </div>
+
+                        </div>
+
+
+                        <!-- LINE -->
+
+                        <div class="card">
+
+                            <div class="section-heading">
+
+                                <div class="heading-icon">
+                                    ≡
+                                </div>
+
+                                <div>
+
+                                    <h3>
+                                        Informations de la ligne
+                                    </h3>
+
+                                    <p>
+                                        Informations propres au client.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="lineInformation"
+                                class="info-grid"
+                            >
+                            </div>
+
+                        </div>
+
+
+                        <button
+                            id="takeButton"
+                            class="take-button"
+                            onclick="takeSelectedLine()"
+                        >
+                            Prendre en charge
+                        </button>
+
+
+                        <!-- FORM -->
+
+                        <div
+                            id="treatmentForm"
+                            class="card treatment-card hidden"
+                        >
+
+                            <div class="treatment-header">
+
+                                <div>
+
+                                    <span class="processing-dot">
+                                    </span>
+
+                                    <div>
+
+                                        <h3>
+                                            Traitement en cours
+                                        </h3>
+
+                                        <p>
+                                            Complétez les informations.
+                                        </p>
+
+                                    </div>
+
+                                </div>
+
+
+                                <span class="status processing-status">
+                                    En cours
+                                </span>
+
+                            </div>
+
+
+                            <div class="form-grid">
+
+
+                                <div class="form-field">
+
+                                    <label for="subscriberNumber">
+                                        N° Abonné
+                                    </label>
+
+                                    <input
+                                        id="subscriberNumber"
+                                        type="text"
+                                    >
+
+                                </div>
+
+
+                                <div class="form-field">
+
+                                    <label for="idt">
+                                        IDT
+                                    </label>
+
+                                    <input
+                                        id="idt"
+                                        type="text"
+                                    >
+
+                                </div>
+
+
+                                <div class="form-field">
+
+                                    <label for="password">
+                                        MDP
+                                    </label>
+
+                                    <input
+                                        id="password"
+                                        type="text"
+                                    >
+
+                                </div>
+
+
+                                <div class="form-field">
+
+                                    <label for="badContract">
+                                        Contrat BAD
+                                    </label>
+
+                                    <input
+                                        id="badContract"
+                                        type="text"
+                                    >
+
+                                </div>
+
+
+                                <div class="form-field">
+
+                                    <label for="csp">
+                                        CSP
+                                    </label>
+
+                                    <input
+                                        id="csp"
+                                        type="text"
+                                    >
+
+                                </div>
+
+
+                                <div class="form-field full-width">
+
+                                    <label for="comment">
+                                        Commentaire
+                                    </label>
+
+                                    <textarea
+                                        id="comment"
+                                    ></textarea>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="form-actions">
+
+                                <button
+                                    class="secondary-btn"
+                                    onclick="cancelTreatment()"
+                                >
+                                    Annuler
+                                </button>
+
+
+                                <button
+                                    class="complete-btn"
+                                    onclick="completeTreatment()"
+                                >
+                                    ✓ Terminer
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ==================================================
+             HISTORY
+        =================================================== -->
+
+        <section
+            id="history"
+            class="page"
+        >
+
+            <div class="card">
+
+                <div class="card-header history-header">
+
+                    <div>
+
+                        <h3>
+                            Historique des traitements
+                        </h3>
+
+                        <p>
+                            Lignes terminées par cet agent.
+                        </p>
+
+                    </div>
+
+
+                    <input
+                        id="historySearch"
+                        class="history-search"
+                        type="search"
+                        placeholder="Rechercher..."
+                    >
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>N° Abonné</th>
+                            <th>IDT</th>
+                            <th>Contrat BAD</th>
+                            <th>Terminé le</th>
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="historyTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<div
+    id="toast"
+    class="toast"
+>
+</div>
+
+
+<!--
+    IMPORTANT:
+    agent-loader.js is generated dynamically below
+    according to ?agent=HAMDANMO
+-->
+
+<script src="js/agent.js"></script>
+
+</body>
+
+</html>
