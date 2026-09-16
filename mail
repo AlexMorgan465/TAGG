@@ -1,708 +1,250 @@
-<!DOCTYPE html>
-<html lang="fr">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Gestion Traitement - Manager</title>
-
-    <link rel="stylesheet" href="css/manager.css">
-</head>
-
-<body>
-
-<div class="app">
-
-    <!-- =====================================================
-         SIDEBAR
-    ====================================================== -->
-
-    <aside class="sidebar">
-
-        <div class="brand">
-
-            <div class="brand-logo">
-                GT
-            </div>
-
-            <div class="brand-text">
-                <strong>Gestion Traitement</strong>
-                <span>Espace Manager</span>
-            </div>
-
-        </div>
-
-
-        <nav class="navigation">
-
-            <button
-                class="nav-btn active"
-                data-page="dashboard"
-            >
-                <span class="nav-icon">▦</span>
-                <span>Tableau de bord</span>
-            </button>
-
-
-            <button
-                class="nav-btn"
-                data-page="import"
-            >
-                <span class="nav-icon">⇧</span>
-                <span>Import Excel</span>
-            </button>
-
-
-            <button
-                class="nav-btn"
-                data-page="assignments"
-            >
-                <span class="nav-icon">⇄</span>
-                <span>Affectations</span>
-
-                <span
-                    id="navUnassignedCount"
-                    class="nav-count"
-                >
-                    0
-                </span>
-            </button>
-
-
-            <button
-                class="nav-btn"
-                data-page="agents"
-            >
-                <span class="nav-icon">♙</span>
-                <span>Agents</span>
-            </button>
-
-        </nav>
-
-
-        <div class="manager-profile">
-
-            <div class="avatar">
-                MG
-            </div>
-
-            <div class="manager-profile-text">
-                <strong>Manager</strong>
-                <span>Gestionnaire</span>
-            </div>
-
-        </div>
-
-    </aside>
-
-
-    <!-- =====================================================
-         MAIN
-    ====================================================== -->
-
-    <main class="main">
-
-        <!-- =================================================
-             TOPBAR
-        ================================================== -->
-
-        <header class="topbar">
-
-            <div>
-
-                <h1 id="pageTitle">
-                    Tableau de bord
-                </h1>
-
-                <p id="pageSubtitle">
-                    Importez et répartissez les lignes entre les agents.
-                </p>
-
-            </div>
-
-
-            <div class="topbar-actions">
-
-                <div
-                    id="currentDate"
-                    class="date-box"
-                >
-                </div>
-
-
-                <button
-                    id="connectFolderButton"
-                    class="secondary-btn"
-                    onclick="connectSharedFolder()"
-                >
-                    📁 Connecter le dossier
-                </button>
-
-
-                <button
-                    class="primary-btn"
-                    onclick="openImportDialog()"
-                >
-                    + Importer Excel
-                </button>
-
-            </div>
-
-        </header>
-
-
-        <!-- =================================================
-             DASHBOARD
-        ================================================== -->
-
-        <section
-            id="dashboard"
-            class="page active"
-        >
-
-            <div class="welcome">
-
-                <div>
-
-                    <span class="eyebrow">
-                        ESPACE MANAGER
-                    </span>
-
-                    <h2>
-                        Gestion des affectations
-                    </h2>
-
-                    <p>
-                        Importez le fichier source, contrôlez les données
-                        puis affectez les lignes aux agents.
-                    </p>
-
-                </div>
-
-
-                <button
-                    class="primary-btn"
-                    onclick="openImportDialog()"
-                >
-                    + Nouvel import
-                </button>
-
-            </div>
-
-
-            <!-- STATS -->
-
-            <div class="stats">
-
-                <article class="stat-card">
-
-                    <div class="stat-icon">
-                        ≡
-                    </div>
-
-                    <div>
-                        <span>Lignes importées</span>
-                        <strong id="totalLinesCount">0</strong>
-                    </div>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <div class="stat-icon warning-icon">
-                        !
-                    </div>
-
-                    <div>
-                        <span>Non affectées</span>
-                        <strong id="unassignedCount">0</strong>
-                    </div>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <div class="stat-icon success-icon">
-                        ✓
-                    </div>
-
-                    <div>
-                        <span>Affectées</span>
-                        <strong id="assignedCount">0</strong>
-                    </div>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <div class="stat-icon active-icon">
-                        ♙
-                    </div>
-
-                    <div>
-                        <span>Agents</span>
-                        <strong id="agentsCount">0</strong>
-                    </div>
-
-                </article>
-
-            </div>
-
-
-            <!-- LAST IMPORT -->
-
-            <div class="card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h3>Dernier import</h3>
-                        <p>
-                            Informations du fichier actuellement chargé.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="dashboardImportInformation"
-                    class="info-grid"
-                >
-                </div>
-
-            </div>
-
-
-            <!-- DISTRIBUTION -->
-
-            <div class="card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h3>Répartition par agent</h3>
-                        <p>
-                            Nombre de lignes actuellement affectées.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="agentDistribution"
-                    class="agent-distribution"
-                >
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             IMPORT
-        ================================================== -->
-
-        <section
-            id="import"
-            class="page"
-        >
-
-            <div class="card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h3>Importer un fichier Excel</h3>
-                        <p>
-                            Sélectionnez le fichier source contenant les
-                            informations CSP et les lignes clients.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="dropZone"
-                    class="import-zone"
-                    onclick="openImportDialog()"
-                >
-
-                    <div class="import-icon">
-                        ⇧
-                    </div>
-
-                    <h3>
-                        Sélectionner un fichier Excel
-                    </h3>
-
-                    <p>
-                        Formats acceptés : XLSX, XLS, XLSM
-                    </p>
-
-                    <button
-                        class="primary-btn"
-                        type="button"
-                    >
-                        Parcourir
-                    </button>
-
-                </div>
-
-
-                <input
-                    id="excelInput"
-                    type="file"
-                    accept=".xlsx,.xls,.xlsm"
-                    hidden
-                >
-
-            </div>
-
-
-            <!-- IMPORT RESULT -->
-
-            <div
-                id="importResult"
-                class="hidden"
-            >
-
-                <div class="card">
-
-                    <div class="card-header">
-
-                        <div>
-                            <h3>Fichier importé</h3>
-                            <p id="importFileName">—</p>
-                        </div>
-
-                        <span class="status success-status">
-                            Importé
-                        </span>
-
-                    </div>
-
-
-                    <div
-                        id="sourceInformation"
-                        class="info-grid"
-                    >
-                    </div>
-
-                </div>
-
-
-                <div class="card">
-
-                    <div class="card-header">
-
-                        <div>
-                            <h3>Lignes détectées</h3>
-                            <p>
-                                Vérifiez les données avant l'affectation.
-                            </p>
-                        </div>
-
-
-                        <span
-                            id="importedRowsCount"
-                            class="pill"
-                        >
-                            0 ligne
-                        </span>
-
-                    </div>
-
-
-                    <div class="table-wrapper">
-
-                        <table>
-
-                            <thead>
-
-                            <tr>
-                                <th>SIRET</th>
-                                <th>Raison sociale</th>
-                                <th>Type</th>
-                                <th>N° Abonné</th>
-                                <th>Identifiant</th>
-                                <th>Contrat BAD</th>
-                                <th>Date limite</th>
-                            </tr>
-
-                            </thead>
-
-
-                            <tbody id="importPreviewTable">
-                            </tbody>
-
-                        </table>
-
-                    </div>
-
-
-                    <div class="card-footer">
-
-                        <button
-                            class="primary-btn"
-                            onclick="goToAssignments()"
-                        >
-                            Passer aux affectations →
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             ASSIGNMENTS
-        ================================================== -->
-
-        <section
-            id="assignments"
-            class="page"
-        >
-
-            <div class="card">
-
-                <div class="card-header assignment-header">
-
-                    <div>
-
-                        <h3>Affectation des lignes</h3>
-
-                        <p>
-                            Sélectionnez un agent pour chaque ligne importée.
-                        </p>
-
-                    </div>
-
-
-                    <div class="assignment-actions">
-
-                        <select id="bulkAgentSelect">
-                            <option value="">
-                                Affectation en masse...
-                            </option>
-                        </select>
-
-
-                        <button
-                            class="secondary-btn"
-                            onclick="assignAllToSelectedAgent()"
-                        >
-                            Affecter
-                        </button>
-
-
-                        <button
-                            id="validateAssignmentsButton"
-                            class="primary-btn"
-                            onclick="validateAssignments()"
-                        >
-                            ✓ Valider les affectations
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-                <div class="assignment-toolbar">
-
-                    <input
-                        id="assignmentSearch"
-                        type="search"
-                        placeholder="Rechercher SIRET ou raison sociale..."
-                    >
-
-
-                    <select id="assignmentFilter">
-
-                        <option value="all">
-                            Toutes les lignes
-                        </option>
-
-                        <option value="unassigned">
-                            Non affectées
-                        </option>
-
-                        <option value="assigned">
-                            Affectées
-                        </option>
-
-                    </select>
-
-                </div>
-
-
-                <div class="table-wrapper">
-
-                    <table>
-
-                        <thead>
-
-                        <tr>
-                            <th>
-                                <input
-                                    id="selectAllLines"
-                                    type="checkbox"
-                                >
-                            </th>
-
-                            <th>SIRET</th>
-                            <th>Raison sociale</th>
-                            <th>Type</th>
-                            <th>Date limite</th>
-                            <th>Agent</th>
-                            <th>Statut</th>
-                        </tr>
-
-                        </thead>
-
-
-                        <tbody id="assignmentTable">
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-             AGENTS
-        ================================================== -->
-
-        <section
-            id="agents"
-            class="page"
-        >
-
-            <div class="card">
-
-                <div class="card-header">
-
-                    <div>
-                        <h3>Agents</h3>
-                        <p>
-                            Gérez les agents disponibles pour les affectations.
-                        </p>
-                    </div>
-
-
-                    <button
-                        class="primary-btn"
-                        onclick="showAddAgentForm()"
-                    >
-                        + Ajouter un agent
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="addAgentForm"
-                    class="add-agent-form hidden"
-                >
-
-                    <div class="form-field">
-
-                        <label for="newAgentId">
-                            Identifiant
-                        </label>
-
-                        <input
-                            id="newAgentId"
-                            type="text"
-                            placeholder="Ex : HAMDANMO"
-                        >
-
-                    </div>
-
-
-                    <div class="form-field">
-
-                        <label for="newAgentName">
-                            Nom affiché
-                        </label>
-
-                        <input
-                            id="newAgentName"
-                            type="text"
-                            placeholder="Ex : Mohamed Hamdan"
-                        >
-
-                    </div>
-
-
-                    <button
-                        class="primary-btn"
-                        onclick="addAgent()"
-                    >
-                        Ajouter
-                    </button>
-
-
-                    <button
-                        class="secondary-btn"
-                        onclick="hideAddAgentForm()"
-                    >
-                        Annuler
-                    </button>
-
-                </div>
-
-
-                <div
-                    id="agentsList"
-                    class="agents-grid"
-                >
-                </div>
-
-            </div>
-
-        </section>
-
-    </main>
-
-</div>
-
-
-<!-- =========================================================
-     TOAST
-========================================================== -->
-
-<div
-    id="toast"
-    class="toast"
->
-</div>
-
-
-<!-- =========================================================
-     SHEETJS
-========================================================== -->
-
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-<script src="js/manager.js"></script>
-
-</body>
-
-</html>
+/* =========================================================
+   FINAL MANAGER ADDITIONS
+========================================================= */
+
+.hidden {
+    display: none !important;
+}
+
+
+/* IMPORT */
+
+.import-zone {
+    min-height: 260px;
+    border: 2px dashed #d9dee8;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.2s ease;
+    padding: 30px;
+}
+
+.import-zone:hover,
+.import-zone.dragging {
+    border-color: #5067e8;
+    background: #f8f9ff;
+}
+
+.import-icon {
+    font-size: 36px;
+    margin-bottom: 15px;
+}
+
+
+/* ASSIGNMENTS */
+
+.assignment-header {
+    gap: 20px;
+}
+
+.assignment-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.assignment-toolbar {
+    display: flex;
+    gap: 12px;
+    padding: 15px 20px;
+    border-top: 1px solid #edf0f5;
+    border-bottom: 1px solid #edf0f5;
+}
+
+.assignment-toolbar input {
+    flex: 1;
+}
+
+.assignment-toolbar input,
+.assignment-toolbar select,
+.agent-assignment-select,
+.assignment-actions select {
+    min-height: 40px;
+    border: 1px solid #dfe3eb;
+    border-radius: 8px;
+    padding: 0 12px;
+    background: white;
+}
+
+
+/* AGENTS */
+
+.agents-grid {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(220px, 1fr)
+    );
+    gap: 16px;
+}
+
+.agent-card {
+    border: 1px solid #e8ebf1;
+    border-radius: 14px;
+    padding: 18px;
+    background: white;
+}
+
+.agent-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.agent-large-avatar,
+.distribution-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef1ff;
+    font-weight: 700;
+}
+
+.delete-agent-btn {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    cursor: pointer;
+    color: #9ca3af;
+}
+
+.delete-agent-btn:hover {
+    color: #dc2626;
+}
+
+.agent-id {
+    color: #8a93a5;
+    font-size: 12px;
+}
+
+.agent-stat {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #edf0f5;
+    display: flex;
+    justify-content: space-between;
+}
+
+.agent-link {
+    margin-top: 12px;
+    font-size: 11px;
+    background: #f7f8fb;
+    border-radius: 7px;
+    padding: 8px;
+    word-break: break-all;
+}
+
+
+/* ADD AGENT */
+
+.add-agent-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+    background: #f8f9fc;
+    border-radius: 12px;
+}
+
+.add-agent-form .form-field {
+    flex: 1;
+}
+
+.add-agent-form label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.add-agent-form input {
+    width: 100%;
+    min-height: 40px;
+    box-sizing: border-box;
+    border: 1px solid #dfe3eb;
+    border-radius: 8px;
+    padding: 0 12px;
+}
+
+
+/* DISTRIBUTION */
+
+.agent-distribution {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fill,
+        minmax(210px, 1fr)
+    );
+    gap: 12px;
+}
+
+.distribution-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid #e9ecf2;
+    padding: 14px;
+    border-radius: 12px;
+}
+
+.distribution-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.distribution-info span {
+    font-size: 11px;
+    color: #8b94a5;
+}
+
+.distribution-count {
+    font-size: 20px;
+}
+
+
+/* FOLDER */
+
+#connectFolderButton.connected {
+    border-color: #16a34a;
+    color: #15803d;
+}
+
+
+/* FOOTER */
+
+.card-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 18px 20px;
+    border-top: 1px solid #edf0f5;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 1000px) {
+
+    .assignment-actions {
+        width: 100%;
+    }
+
+    .assignment-toolbar {
+        flex-direction: column;
+    }
+
+    .add-agent-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+}
