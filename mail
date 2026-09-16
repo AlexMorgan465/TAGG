@@ -1,3648 +1,708 @@
-/* ============================================================
-   GESTION TRAITEMENT
-   MANAGER APPLICATION
-============================================================ */
+<!DOCTYPE html>
+<html lang="fr">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-/* ============================================================
-   CONFIGURATION
-============================================================ */
+    <title>Gestion Traitement - Manager</title>
 
-const STORAGE_KEY =
-    "gestion_traitement_manager_v1";
+    <link rel="stylesheet" href="css/manager.css">
+</head>
 
+<body>
 
-/*
-    Default agents.
+<div class="app">
 
-    You can change these.
-*/
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
 
-const DEFAULT_AGENTS = [
+    <aside class="sidebar">
 
-    {
-        id: "HAMDANMO",
-        name: "HAMDANMO"
-    },
+        <div class="brand">
 
-    {
-        id: "YASSINE",
-        name: "YASSINE"
-    },
+            <div class="brand-logo">
+                GT
+            </div>
 
-    {
-        id: "SARA",
-        name: "SARA"
-    }
+            <div class="brand-text">
+                <strong>Gestion Traitement</strong>
+                <span>Espace Manager</span>
+            </div>
 
-];
+        </div>
 
 
-/* ============================================================
-   STATE
-============================================================ */
+        <nav class="navigation">
 
-function createDefaultState() {
+            <button
+                class="nav-btn active"
+                data-page="dashboard"
+            >
+                <span class="nav-icon">▦</span>
+                <span>Tableau de bord</span>
+            </button>
 
-    return {
 
-        source: {
+            <button
+                class="nav-btn"
+                data-page="import"
+            >
+                <span class="nav-icon">⇧</span>
+                <span>Import Excel</span>
+            </button>
 
-            fileName: "",
 
-            nomCSP: "",
+            <button
+                class="nav-btn"
+                data-page="assignments"
+            >
+                <span class="nav-icon">⇄</span>
+                <span>Affectations</span>
 
-            contratBAD: "",
-
-            idtConnexion: "",
-
-            mdpCSP: "",
-
-            numeroAbonneCSP: "",
-
-            iban: "",
-
-            importedAt: ""
-
-        },
-
-        lines: [],
-
-        agents:
-            JSON.parse(
-                JSON.stringify(
-                    DEFAULT_AGENTS
-                )
-            ),
-
-        validated: false
-
-    };
-
-}
-
-
-function loadState() {
-
-    const saved =
-        localStorage.getItem(
-            STORAGE_KEY
-        );
-
-
-    if (!saved) {
-
-        return createDefaultState();
-
-    }
-
-
-    try {
-
-        const parsed =
-            JSON.parse(
-                saved
-            );
-
-
-        if (
-            !Array.isArray(
-                parsed.agents
-            )
-        ) {
-
-            parsed.agents =
-                JSON.parse(
-                    JSON.stringify(
-                        DEFAULT_AGENTS
-                    )
-                );
-
-        }
-
-
-        if (
-            !Array.isArray(
-                parsed.lines
-            )
-        ) {
-
-            parsed.lines =
-                [];
-
-        }
-
-
-        return parsed;
-
-    }
-    catch (error) {
-
-        console.error(
-            "Erreur chargement état Manager:",
-            error
-        );
-
-
-        return createDefaultState();
-
-    }
-
-}
-
-
-let state =
-    loadState();
-
-
-function saveState() {
-
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(
-            state
-        )
-    );
-
-}
-
-
-/* ============================================================
-   SHARED FOLDER
-============================================================ */
-
-let sharedFolderHandle =
-    null;
-
-
-/*
-    The Manager must select:
-
-    GestionTraitement/
-
-    NOT:
-
-    data/
-
-    NOT:
-
-    agents/
-*/
-
-async function connectSharedFolder() {
-
-    if (
-        !(
-            "showDirectoryPicker"
-            in window
-        )
-    ) {
-
-        showToast(
-            "L'accès direct au dossier n'est pas disponible dans ce navigateur."
-        );
-
-        return;
-
-    }
-
-
-    try {
-
-        sharedFolderHandle =
-            await window.showDirectoryPicker({
-                mode: "readwrite"
-            });
-
-
-        const button =
-            document.getElementById(
-                "connectFolderButton"
-            );
-
-
-        button.textContent =
-            "✓ Dossier connecté";
-
-
-        button.classList.add(
-            "connected"
-        );
-
-
-        showToast(
-            "Dossier GestionTraitement connecté."
-        );
-
-    }
-    catch (error) {
-
-        if (
-            error.name !==
-            "AbortError"
-        ) {
-
-            console.error(
-                "Erreur dossier:",
-                error
-            );
-
-
-            showToast(
-                "Impossible d'accéder au dossier."
-            );
-
-        }
-
-    }
-
-}
-
-
-/* ============================================================
-   NAVIGATION
-============================================================ */
-
-const navigationButtons =
-    document.querySelectorAll(
-        ".nav-btn"
-    );
-
-
-navigationButtons.forEach(
-    button => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                showPage(
-                    button.dataset.page
-                );
-
-            }
-        );
-
-    }
-);
-
-
-function showPage(
-    pageName
-) {
-
-    document
-        .querySelectorAll(
-            ".page"
-        )
-        .forEach(
-            page => {
-
-                page.classList.remove(
-                    "active"
-                );
-
-            }
-        );
-
-
-    navigationButtons.forEach(
-        button => {
-
-            button.classList.remove(
-                "active"
-            );
-
-        }
-    );
-
-
-    const page =
-        document.getElementById(
-            pageName
-        );
-
-
-    if (page) {
-
-        page.classList.add(
-            "active"
-        );
-
-    }
-
-
-    const navButton =
-        document.querySelector(
-            `[data-page="${pageName}"]`
-        );
-
-
-    if (navButton) {
-
-        navButton.classList.add(
-            "active"
-        );
-
-    }
-
-
-    const pageInformation = {
-
-        dashboard: {
-
-            title:
-                "Tableau de bord",
-
-            subtitle:
-                "Importez et répartissez les lignes entre les agents."
-
-        },
-
-        import: {
-
-            title:
-                "Import Excel",
-
-            subtitle:
-                "Importez et contrôlez les données du fichier source."
-
-        },
-
-        assignments: {
-
-            title:
-                "Affectations",
-
-            subtitle:
-                "Répartissez les lignes entre les agents."
-
-        },
-
-        agents: {
-
-            title:
-                "Agents",
-
-            subtitle:
-                "Gérez les agents disponibles."
-
-        }
-
-    };
-
-
-    const info =
-        pageInformation[
-            pageName
-        ];
-
-
-    if (info) {
-
-        document.getElementById(
-            "pageTitle"
-        ).textContent =
-            info.title;
-
-
-        document.getElementById(
-            "pageSubtitle"
-        ).textContent =
-            info.subtitle;
-
-    }
-
-
-    if (
-        pageName ===
-        "dashboard"
-    ) {
-
-        renderDashboard();
-
-    }
-
-
-    if (
-        pageName ===
-        "assignments"
-    ) {
-
-        renderAssignments();
-
-    }
-
-
-    if (
-        pageName ===
-        "agents"
-    ) {
-
-        renderAgents();
-
-    }
-
-}
-
-
-function goToAssignments() {
-
-    showPage(
-        "assignments"
-    );
-
-}
-
-
-/* ============================================================
-   DATE
-============================================================ */
-
-function renderDate() {
-
-    document.getElementById(
-        "currentDate"
-    ).textContent =
-        new Date()
-            .toLocaleDateString(
-                "fr-FR",
-                {
-                    weekday: "long",
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric"
-                }
-            );
-
-}
-
-
-/* ============================================================
-   OPEN IMPORT
-============================================================ */
-
-function openImportDialog() {
-
-    document.getElementById(
-        "excelInput"
-    ).click();
-
-}
-
-
-/* ============================================================
-   EXCEL INPUT
-============================================================ */
-
-const excelInput =
-    document.getElementById(
-        "excelInput"
-    );
-
-
-excelInput.addEventListener(
-    "change",
-    event => {
-
-        const file =
-            event.target.files[0];
-
-
-        if (!file) {
-            return;
-        }
-
-
-        importExcelFile(
-            file
-        );
-
-
-        /*
-            Allows re-selecting same file.
-        */
-
-        event.target.value =
-            "";
-
-    }
-);
-
-
-/* ============================================================
-   EXCEL IMPORT
-============================================================ */
-
-function importExcelFile(
-    file
-) {
-
-    if (
-        typeof XLSX ===
-        "undefined"
-    ) {
-
-        showToast(
-            "SheetJS n'est pas disponible."
-        );
-
-        return;
-
-    }
-
-
-    const reader =
-        new FileReader();
-
-
-    reader.onload =
-        event => {
-
-            try {
-
-                const bytes =
-                    new Uint8Array(
-                        event.target.result
-                    );
-
-
-                const workbook =
-                    XLSX.read(
-                        bytes,
-                        {
-                            type: "array",
-
-                            cellDates: true,
-
-                            cellText: true
-                        }
-                    );
-
-
-                if (
-                    workbook.SheetNames.length ===
+                <span
+                    id="navUnassignedCount"
+                    class="nav-count"
+                >
                     0
-                ) {
+                </span>
+            </button>
 
-                    showToast(
-                        "Le classeur ne contient aucune feuille."
-                    );
 
-                    return;
+            <button
+                class="nav-btn"
+                data-page="agents"
+            >
+                <span class="nav-icon">♙</span>
+                <span>Agents</span>
+            </button>
 
-                }
+        </nav>
 
 
-                /*
-                    We currently use first worksheet.
-                */
+        <div class="manager-profile">
 
-                const worksheetName =
-                    workbook.SheetNames[0];
+            <div class="avatar">
+                MG
+            </div>
 
+            <div class="manager-profile-text">
+                <strong>Manager</strong>
+                <span>Gestionnaire</span>
+            </div>
 
-                const worksheet =
-                    workbook.Sheets[
-                        worksheetName
-                    ];
+        </div>
 
+    </aside>
 
-                const rows =
-                    XLSX.utils.sheet_to_json(
-                        worksheet,
-                        {
-                            header: 1,
 
-                            defval: "",
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
 
-                            raw: false,
+    <main class="main">
 
-                            blankrows: false
-                        }
-                    );
+        <!-- =================================================
+             TOPBAR
+        ================================================== -->
 
+        <header class="topbar">
 
-                if (
-                    rows.length ===
-                    0
-                ) {
+            <div>
 
-                    showToast(
-                        "Aucune donnée détectée."
-                    );
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
 
-                    return;
+                <p id="pageSubtitle">
+                    Importez et répartissez les lignes entre les agents.
+                </p>
 
-                }
+            </div>
 
 
-                processExcelData(
-                    rows,
-                    file.name
-                );
+            <div class="topbar-actions">
 
-            }
-            catch (error) {
-
-                console.error(
-                    "Erreur import Excel:",
-                    error
-                );
-
-
-                showToast(
-                    "Impossible de lire le fichier Excel."
-                );
-
-            }
-
-        };
-
-
-    reader.onerror =
-        () => {
-
-            showToast(
-                "Erreur pendant la lecture du fichier."
-            );
-
-        };
-
-
-    reader.readAsArrayBuffer(
-        file
-    );
-
-}
-
-
-/* ============================================================
-   NORMALIZE TEXT
-============================================================ */
-
-function normalizeText(
-    value
-) {
-
-    return String(
-        value ?? ""
-    )
-    .normalize(
-        "NFD"
-    )
-    .replace(
-        /[\u0300-\u036f]/g,
-        ""
-    )
-    .replace(
-        /\s+/g,
-        " "
-    )
-    .trim()
-    .toLowerCase();
-
-}
-
-
-/* ============================================================
-   FIND VALUE NEAR LABEL
-============================================================ */
-
-function findValueNearLabel(
-    rows,
-    possibleLabels
-) {
-
-    const labels =
-        possibleLabels.map(
-            normalizeText
-        );
-
-
-    for (
-        let rowIndex = 0;
-        rowIndex < rows.length;
-        rowIndex++
-    ) {
-
-        const row =
-            rows[
-                rowIndex
-            ];
-
-
-        for (
-            let columnIndex = 0;
-            columnIndex < row.length;
-            columnIndex++
-        ) {
-
-            const cell =
-                normalizeText(
-                    row[
-                        columnIndex
-                    ]
-                );
-
-
-            if (
-                !cell
-            ) {
-                continue;
-            }
-
-
-            const matches =
-                labels.some(
-                    label =>
-
-                        cell === label
-
-                        ||
-
-                        cell.includes(
-                            label
-                        )
-                );
-
-
-            if (
-                !matches
-            ) {
-                continue;
-            }
-
-
-            /*
-                First try cells on the right.
-            */
-
-            for (
-                let offset = 1;
-                offset <= 4;
-                offset++
-            ) {
-
-                const value =
-                    row[
-                        columnIndex +
-                        offset
-                    ];
-
-
-                if (
-                    value !== undefined &&
-                    String(value).trim() !== ""
-                ) {
-
-                    return String(
-                        value
-                    ).trim();
-
-                }
-
-            }
-
-
-            /*
-                Then try next row.
-            */
-
-            if (
-                rows[
-                    rowIndex + 1
-                ]
-            ) {
-
-                for (
-                    let offset = 0;
-                    offset <= 3;
-                    offset++
-                ) {
-
-                    const value =
-                        rows[
-                            rowIndex + 1
-                        ][
-                            columnIndex +
-                            offset
-                        ];
-
-
-                    if (
-                        value !== undefined &&
-                        String(value).trim() !== ""
-                    ) {
-
-                        return String(
-                            value
-                        ).trim();
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-
-    return "";
-
-}
-
-
-/* ============================================================
-   FIND CLIENT TABLE HEADER
-============================================================ */
-
-function findClientHeaderRow(
-    rows
-) {
-
-    for (
-        let index = 0;
-        index < rows.length;
-        index++
-    ) {
-
-        const normalizedRow =
-            rows[index]
-                .map(
-                    normalizeText
-                );
-
-
-        const hasSiret =
-            normalizedRow.some(
-                cell =>
-                    cell.includes(
-                        "siret"
-                    )
-            );
-
-
-        const hasCompany =
-            normalizedRow.some(
-                cell =>
-
-                    cell.includes(
-                        "raison sociale"
-                    )
-
-                    ||
-
-                    cell.includes(
-                        "raison"
-                    )
-            );
-
-
-        if (
-            hasSiret &&
-            hasCompany
-        ) {
-
-            return index;
-
-        }
-
-    }
-
-
-    return -1;
-
-}
-
-
-/* ============================================================
-   FIND COLUMN
-============================================================ */
-
-function findColumnIndex(
-    headers,
-    possibleNames
-) {
-
-    const normalizedHeaders =
-        headers.map(
-            normalizeText
-        );
-
-
-    const normalizedNames =
-        possibleNames.map(
-            normalizeText
-        );
-
-
-    /*
-        Exact first.
-    */
-
-    for (
-        const name
-        of normalizedNames
-    ) {
-
-        const index =
-            normalizedHeaders.findIndex(
-                header =>
-                    header === name
-            );
-
-
-        if (
-            index !== -1
-        ) {
-
-            return index;
-
-        }
-
-    }
-
-
-    /*
-        Partial second.
-    */
-
-    for (
-        const name
-        of normalizedNames
-    ) {
-
-        const index =
-            normalizedHeaders.findIndex(
-                header =>
-
-                    header.includes(
-                        name
-                    )
-
-                    ||
-
-                    name.includes(
-                        header
-                    )
-            );
-
-
-        if (
-            index !== -1
-        ) {
-
-            return index;
-
-        }
-
-    }
-
-
-    return -1;
-
-}
-
-
-/* ============================================================
-   CELL VALUE
-============================================================ */
-
-function cellValue(
-    row,
-    index
-) {
-
-    if (
-        index === -1 ||
-        index === undefined
-    ) {
-
-        return "";
-
-    }
-
-
-    return String(
-        row[index] ?? ""
-    ).trim();
-
-}
-
-
-/* ============================================================
-   CLEAN SIRET
-============================================================ */
-
-function cleanSiret(
-    value
-) {
-
-    /*
-        Excel sometimes returns numbers with spaces
-        or scientific formatting.
-
-        Here we preserve string representation and
-        remove spaces.
-    */
-
-    return String(
-        value ?? ""
-    )
-    .replace(
-        /\s+/g,
-        ""
-    )
-    .trim();
-
-}
-
-
-/* ============================================================
-   GENERATE STABLE LINE ID
-============================================================ */
-
-function createLineId(
-    siret,
-    company,
-    rowIndex
-) {
-
-    const safeSiret =
-        cleanSiret(
-            siret
-        )
-        .replace(
-            /[^a-zA-Z0-9]/g,
-            ""
-        );
-
-
-    const safeCompany =
-        normalizeText(
-            company
-        )
-        .replace(
-            /[^a-z0-9]/g,
-            ""
-        )
-        .substring(
-            0,
-            20
-        );
-
-
-    return (
-        "LINE-" +
-        (
-            safeSiret ||
-            safeCompany ||
-            "ROW"
-        )
-        +
-        "-" +
-        rowIndex
-    );
-
-}
-
-
-/* ============================================================
-   PROCESS EXCEL
-============================================================ */
-
-function processExcelData(
-    rows,
-    fileName
-) {
-
-    /*
-        =====================================================
-        1. SOURCE INFORMATION
-        =====================================================
-    */
-
-    const source = {
-
-        fileName:
-            fileName,
-
-        nomCSP:
-            findValueNearLabel(
-                rows,
-                [
-                    "Coordonnées du CSP",
-                    "Nom CSP",
-                    "CSP"
-                ]
-            ),
-
-        contratBAD:
-            findValueNearLabel(
-                rows,
-                [
-                    "Contrat BAD",
-                    "Contrat B@D"
-                ]
-            ),
-
-        idtConnexion:
-            findValueNearLabel(
-                rows,
-                [
-                    "Idt de connexion",
-                    "Identifiant de connexion",
-                    "IDT connexion"
-                ]
-            ),
-
-        mdpCSP:
-            findValueNearLabel(
-                rows,
-                [
-                    "Mdp CSP",
-                    "Mot de passe CSP"
-                ]
-            ),
-
-        numeroAbonneCSP:
-            findValueNearLabel(
-                rows,
-                [
-                    "N° Abonné CSP",
-                    "N Abonné CSP",
-                    "Numero Abonné CSP",
-                    "Numéro Abonné CSP"
-                ]
-            ),
-
-        iban:
-            findValueNearLabel(
-                rows,
-                [
-                    "IBAN de prélèvement",
-                    "IBAN"
-                ]
-            ),
-
-        importedAt:
-            new Date()
-                .toLocaleString(
-                    "fr-FR"
-                )
-
-    };
-
-
-    /*
-        In the workbook screenshot, CYBERG may appear
-        as a title above "Coordonnées du CSP".
-
-        If CSP detection returned the label itself,
-        try to detect the value immediately above.
-    */
-
-    if (
-        !source.nomCSP ||
-        normalizeText(
-            source.nomCSP
-        ).includes(
-            "coordonnees"
-        )
-    ) {
-
-        source.nomCSP =
-            detectCSPTitle(
-                rows
-            );
-
-    }
-
-
-    /*
-        =====================================================
-        2. CLIENT TABLE
-        =====================================================
-    */
-
-    const headerRowIndex =
-        findClientHeaderRow(
-            rows
-        );
-
-
-    if (
-        headerRowIndex ===
-        -1
-    ) {
-
-        showToast(
-            "Le tableau client n'a pas été détecté."
-        );
-
-        return;
-
-    }
-
-
-    const headers =
-        rows[
-            headerRowIndex
-        ];
-
-
-    /*
-        Column mapping
-    */
-
-    const columns = {
-
-        siret:
-            findColumnIndex(
-                headers,
-                [
-                    "SIRET du siège social",
-                    "SIRET"
-                ]
-            ),
-
-        raisonSociale:
-            findColumnIndex(
-                headers,
-                [
-                    "RAISON SOCIALE",
-                    "Raison sociale"
-                ]
-            ),
-
-        typeFacture:
-            findColumnIndex(
-                headers,
-                [
-                    "Factures en émission et/ou réception",
-                    "E/R/E+R",
-                    "facture type",
-                    "Type facture"
-                ]
-            ),
-
-        numeroAbonne:
-            findColumnIndex(
-                headers,
-                [
-                    "N° Abonné e-factures",
-                    "N Abonné e-factures",
-                    "Numero Abonné e-factures"
-                ]
-            ),
-
-        identifiant:
-            findColumnIndex(
-                headers,
-                [
-                    "Identifiant"
-                ]
-            ),
-
-        mdp:
-            findColumnIndex(
-                headers,
-                [
-                    "Mdp",
-                    "Mot de passe"
-                ]
-            ),
-
-        contratBAD:
-            findColumnIndex(
-                headers,
-                [
-                    "Contrat B@D",
-                    "Contrat BAD"
-                ]
-            ),
-
-        rattachement:
-            findColumnIndex(
-                headers,
-                [
-                    "Rattachement au contrat CSP",
-                    "Rattachement"
-                ]
-            ),
-
-        dateLimite:
-            findColumnIndex(
-                headers,
-                [
-                    "Date limite de traitement",
-                    "Date limite"
-                ]
-            ),
-
-        commentaire:
-            findColumnIndex(
-                headers,
-                [
-                    "Commentaire"
-                ]
-            )
-
-    };
-
-
-    /*
-        Essential columns.
-    */
-
-    if (
-        columns.siret === -1 ||
-        columns.raisonSociale === -1
-    ) {
-
-        console.error(
-            "Colonnes détectées:",
-            columns
-        );
-
-
-        showToast(
-            "Les colonnes SIRET / Raison sociale n'ont pas été détectées."
-        );
-
-        return;
-
-    }
-
-
-    const importedLines =
-        [];
-
-
-    /*
-        Start after header.
-    */
-
-    for (
-        let index =
-            headerRowIndex + 1;
-
-        index <
-            rows.length;
-
-        index++
-    ) {
-
-        const row =
-            rows[index];
-
-
-        const siret =
-            cleanSiret(
-                cellValue(
-                    row,
-                    columns.siret
-                )
-            );
-
-
-        const raisonSociale =
-            cellValue(
-                row,
-                columns.raisonSociale
-            );
-
-
-        /*
-            Empty/end row.
-        */
-
-        if (
-            !siret &&
-            !raisonSociale
-        ) {
-
-            continue;
-
-        }
-
-
-        /*
-            Ignore rows that clearly aren't client rows.
-        */
-
-        if (
-            normalizeText(
-                siret
-            ).includes(
-                "siret"
-            )
-        ) {
-
-            continue;
-
-        }
-
-
-        importedLines.push({
-
-            id:
-                createLineId(
-                    siret,
-                    raisonSociale,
-                    index
-                ),
-
-            assignedTo:
-                null,
-
-            selected:
-                false,
-
-            line: {
-
-                siret:
-                    siret,
-
-                raisonSociale:
-                    raisonSociale,
-
-                typeFacture:
-                    cellValue(
-                        row,
-                        columns.typeFacture
-                    ),
-
-                numeroAbonne:
-                    cellValue(
-                        row,
-                        columns.numeroAbonne
-                    ),
-
-                identifiant:
-                    cellValue(
-                        row,
-                        columns.identifiant
-                    ),
-
-                mdp:
-                    cellValue(
-                        row,
-                        columns.mdp
-                    ),
-
-                contratBAD:
-                    cellValue(
-                        row,
-                        columns.contratBAD
-                    ),
-
-                rattachement:
-                    cellValue(
-                        row,
-                        columns.rattachement
-                    ),
-
-                dateLimite:
-                    cellValue(
-                        row,
-                        columns.dateLimite
-                    ),
-
-                commentaire:
-                    cellValue(
-                        row,
-                        columns.commentaire
-                    )
-
-            }
-
-        });
-
-    }
-
-
-    if (
-        importedLines.length ===
-        0
-    ) {
-
-        showToast(
-            "Aucune ligne client détectée."
-        );
-
-        return;
-
-    }
-
-
-    /*
-        Replace previous import.
-    */
-
-    state.source =
-        source;
-
-
-    state.lines =
-        importedLines;
-
-
-    state.validated =
-        false;
-
-
-    saveState();
-
-
-    renderAll();
-
-
-    showPage(
-        "import"
-    );
-
-
-    showToast(
-        `${importedLines.length} ligne(s) importée(s).`
-    );
-
-}
-
-
-/* ============================================================
-   DETECT CSP TITLE
-============================================================ */
-
-function detectCSPTitle(
-    rows
-) {
-
-    for (
-        let rowIndex = 0;
-        rowIndex < rows.length;
-        rowIndex++
-    ) {
-
-        const row =
-            rows[
-                rowIndex
-            ];
-
-
-        for (
-            let columnIndex = 0;
-            columnIndex < row.length;
-            columnIndex++
-        ) {
-
-            const cell =
-                normalizeText(
-                    row[
-                        columnIndex
-                    ]
-                );
-
-
-            if (
-                cell.includes(
-                    "coordonnees du csp"
-                )
-            ) {
-
-                /*
-                    Search above.
-                */
-
-                for (
-                    let offset = 1;
-                    offset <= 3;
-                    offset++
-                ) {
-
-                    const previousRow =
-                        rows[
-                            rowIndex -
-                            offset
-                        ];
-
-
-                    if (
-                        !previousRow
-                    ) {
-                        continue;
-                    }
-
-
-                    const candidate =
-                        previousRow[
-                            columnIndex
-                        ];
-
-
-                    if (
-                        candidate &&
-                        String(candidate).trim()
-                    ) {
-
-                        return String(
-                            candidate
-                        ).trim();
-
-                    }
-
-
-                    /*
-                        Search whole previous row.
-                    */
-
-                    const firstValue =
-                        previousRow.find(
-                            value =>
-                                String(
-                                    value ?? ""
-                                ).trim()
-                        );
-
-
-                    if (
-                        firstValue
-                    ) {
-
-                        return String(
-                            firstValue
-                        ).trim();
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-
-    return "";
-
-}
-
-
-/* ============================================================
-   SOURCE INFORMATION UI
-============================================================ */
-
-function getSourceInformation() {
-
-    return [
-
-        [
-            "Fichier",
-            state.source.fileName
-        ],
-
-        [
-            "CSP",
-            state.source.nomCSP
-        ],
-
-        [
-            "Contrat BAD",
-            state.source.contratBAD
-        ],
-
-        [
-            "IDT connexion",
-            state.source.idtConnexion
-        ],
-
-        [
-            "MDP CSP",
-            state.source.mdpCSP
-        ],
-
-        [
-            "N° Abonné CSP",
-            state.source.numeroAbonneCSP
-        ],
-
-        [
-            "IBAN",
-            state.source.iban
-        ],
-
-        [
-            "Importé le",
-            state.source.importedAt
-        ]
-
-    ];
-
-}
-
-
-function renderInformation(
-    container,
-    information
-) {
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML =
-        "";
-
-
-    information.forEach(
-        ([label, value]) => {
-
-            const element =
-                document.createElement(
-                    "div"
-                );
-
-
-            element.className =
-                "info-item";
-
-
-            const labelElement =
-                document.createElement(
-                    "span"
-                );
-
-
-            labelElement.className =
-                "info-label";
-
-
-            labelElement.textContent =
-                label;
-
-
-            const valueElement =
-                document.createElement(
-                    "span"
-                );
-
-
-            valueElement.className =
-                "info-value";
-
-
-            valueElement.textContent =
-                value || "—";
-
-
-            element.append(
-                labelElement,
-                valueElement
-            );
-
-
-            container.appendChild(
-                element
-            );
-
-        }
-    );
-
-}
-
-
-/* ============================================================
-   IMPORT PAGE
-============================================================ */
-
-function renderImportPage() {
-
-    const result =
-        document.getElementById(
-            "importResult"
-        );
-
-
-    if (
-        state.lines.length ===
-        0
-    ) {
-
-        result.classList.add(
-            "hidden"
-        );
-
-        return;
-
-    }
-
-
-    result.classList.remove(
-        "hidden"
-    );
-
-
-    document.getElementById(
-        "importFileName"
-    ).textContent =
-        state.source.fileName ||
-        "—";
-
-
-    document.getElementById(
-        "importedRowsCount"
-    ).textContent =
-        `${state.lines.length} ligne(s)`;
-
-
-    renderInformation(
-        document.getElementById(
-            "sourceInformation"
-        ),
-        getSourceInformation()
-    );
-
-
-    const table =
-        document.getElementById(
-            "importPreviewTable"
-        );
-
-
-    table.innerHTML =
-        "";
-
-
-    state.lines.forEach(
-        item => {
-
-            table.insertAdjacentHTML(
-                "beforeend",
-                `
-
-                <tr>
-
-                    <td>
-                        ${escapeHTML(item.line.siret)}
-                    </td>
-
-                    <td>
-                        <strong>
-                            ${escapeHTML(item.line.raisonSociale)}
-                        </strong>
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.typeFacture || "—")}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.numeroAbonne || "—")}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.identifiant || "—")}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.contratBAD || "—")}
-                    </td>
-
-                    <td>
-                        ${escapeHTML(item.line.dateLimite || "—")}
-                    </td>
-
-                </tr>
-
-                `
-            );
-
-        }
-    );
-
-}
-
-
-/* ============================================================
-   COUNTERS
-============================================================ */
-
-function getAssignedCount() {
-
-    return state.lines.filter(
-        item =>
-            Boolean(
-                item.assignedTo
-            )
-    ).length;
-
-}
-
-
-function getUnassignedCount() {
-
-    return state.lines.filter(
-        item =>
-            !item.assignedTo
-    ).length;
-
-}
-
-
-function updateCounters() {
-
-    const total =
-        state.lines.length;
-
-
-    const assigned =
-        getAssignedCount();
-
-
-    const unassigned =
-        getUnassignedCount();
-
-
-    document.getElementById(
-        "totalLinesCount"
-    ).textContent =
-        total;
-
-
-    document.getElementById(
-        "assignedCount"
-    ).textContent =
-        assigned;
-
-
-    document.getElementById(
-        "unassignedCount"
-    ).textContent =
-        unassigned;
-
-
-    document.getElementById(
-        "agentsCount"
-    ).textContent =
-        state.agents.length;
-
-
-    document.getElementById(
-        "navUnassignedCount"
-    ).textContent =
-        unassigned;
-
-}
-
-
-/* ============================================================
-   DASHBOARD
-============================================================ */
-
-function renderDashboard() {
-
-    updateCounters();
-
-
-    renderInformation(
-        document.getElementById(
-            "dashboardImportInformation"
-        ),
-        getSourceInformation()
-    );
-
-
-    renderAgentDistribution();
-
-}
-
-
-/* ============================================================
-   AGENT DISTRIBUTION
-============================================================ */
-
-function renderAgentDistribution() {
-
-    const container =
-        document.getElementById(
-            "agentDistribution"
-        );
-
-
-    container.innerHTML =
-        "";
-
-
-    if (
-        state.agents.length ===
-        0
-    ) {
-
-        container.innerHTML =
-            "<p>Aucun agent configuré.</p>";
-
-        return;
-
-    }
-
-
-    state.agents.forEach(
-        agent => {
-
-            const count =
-                state.lines.filter(
-                    line =>
-                        line.assignedTo ===
-                        agent.id
-                ).length;
-
-
-            const element =
-                document.createElement(
-                    "div"
-                );
-
-
-            element.className =
-                "distribution-item";
-
-
-            element.innerHTML = `
-
-                <div class="distribution-avatar">
-
-                    ${escapeHTML(
-                        getInitials(
-                            agent.name
-                        )
-                    )}
-
+                <div
+                    id="currentDate"
+                    class="date-box"
+                >
                 </div>
 
 
-                <div class="distribution-info">
+                <button
+                    id="connectFolderButton"
+                    class="secondary-btn"
+                    onclick="connectSharedFolder()"
+                >
+                    📁 Connecter le dossier
+                </button>
 
-                    <strong>
-                        ${escapeHTML(agent.name)}
-                    </strong>
 
-                    <span>
-                        ${count} ligne(s)
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
+                >
+                    + Importer Excel
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- =================================================
+             DASHBOARD
+        ================================================== -->
+
+        <section
+            id="dashboard"
+            class="page active"
+        >
+
+            <div class="welcome">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ESPACE MANAGER
                     </span>
 
+                    <h2>
+                        Gestion des affectations
+                    </h2>
+
+                    <p>
+                        Importez le fichier source, contrôlez les données
+                        puis affectez les lignes aux agents.
+                    </p>
+
                 </div>
 
 
-                <strong class="distribution-count">
-                    ${count}
-                </strong>
-
-            `;
-
-
-            container.appendChild(
-                element
-            );
-
-        }
-    );
-
-}
-
-
-/* ============================================================
-   AGENT OPTIONS
-============================================================ */
-
-function createAgentOptions(
-    selectedAgentId = ""
-) {
-
-    let html =
-        `<option value="">
-            Non affectée
-        </option>`;
-
-
-    state.agents.forEach(
-        agent => {
-
-            const selected =
-                agent.id ===
-                selectedAgentId
-                    ? "selected"
-                    : "";
-
-
-            html += `
-
-                <option
-                    value="${escapeHTML(agent.id)}"
-                    ${selected}
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
                 >
-                    ${escapeHTML(agent.name)}
-                </option>
+                    + Nouvel import
+                </button>
 
-            `;
+            </div>
 
-        }
-    );
 
+            <!-- STATS -->
 
-    return html;
+            <div class="stats">
 
-}
+                <article class="stat-card">
 
-
-/* ============================================================
-   BULK AGENT SELECT
-============================================================ */
-
-function renderBulkAgentSelect() {
-
-    const select =
-        document.getElementById(
-            "bulkAgentSelect"
-        );
-
-
-    const currentValue =
-        select.value;
-
-
-    select.innerHTML = `
-
-        <option value="">
-            Affectation en masse...
-        </option>
-
-    `;
-
-
-    state.agents.forEach(
-        agent => {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                agent.id;
-
-
-            option.textContent =
-                agent.name;
-
-
-            select.appendChild(
-                option
-            );
-
-        }
-    );
-
-
-    if (
-        state.agents.some(
-            agent =>
-                agent.id ===
-                currentValue
-        )
-    ) {
-
-        select.value =
-            currentValue;
-
-    }
-
-}
-
-
-/* ============================================================
-   ASSIGNMENTS
-============================================================ */
-
-function renderAssignments() {
-
-    updateCounters();
-
-    renderBulkAgentSelect();
-
-
-    const table =
-        document.getElementById(
-            "assignmentTable"
-        );
-
-
-    table.innerHTML =
-        "";
-
-
-    const search =
-        document.getElementById(
-            "assignmentSearch"
-        )
-        .value
-        .trim()
-        .toLowerCase();
-
-
-    const filter =
-        document.getElementById(
-            "assignmentFilter"
-        ).value;
-
-
-    const filtered =
-        state.lines.filter(
-            item => {
-
-                const matchesSearch =
-
-                    item.line.siret
-                        .toLowerCase()
-                        .includes(
-                            search
-                        )
-
-                    ||
-
-                    item.line.raisonSociale
-                        .toLowerCase()
-                        .includes(
-                            search
-                        );
-
-
-                let matchesFilter =
-                    true;
-
-
-                if (
-                    filter ===
-                    "assigned"
-                ) {
-
-                    matchesFilter =
-                        Boolean(
-                            item.assignedTo
-                        );
-
-                }
-
-
-                if (
-                    filter ===
-                    "unassigned"
-                ) {
-
-                    matchesFilter =
-                        !item.assignedTo;
-
-                }
-
-
-                return (
-                    matchesSearch &&
-                    matchesFilter
-                );
-
-            }
-        );
-
-
-    if (
-        filtered.length ===
-        0
-    ) {
-
-        table.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="7"
-                    style="
-                        text-align:center;
-                        padding:35px;
-                        color:#9ca3af;
-                    "
-                >
-                    Aucune ligne.
-                </td>
-
-            </tr>
-
-        `;
-
-
-        return;
-
-    }
-
-
-    filtered.forEach(
-        item => {
-
-            const row =
-                document.createElement(
-                    "tr"
-                );
-
-
-            row.innerHTML = `
-
-                <td>
-
-                    <input
-                        type="checkbox"
-                        class="line-checkbox"
-                        data-id="${escapeHTML(item.id)}"
-                        ${item.selected ? "checked" : ""}
-                    >
-
-                </td>
-
-
-                <td>
-                    ${escapeHTML(item.line.siret)}
-                </td>
-
-
-                <td>
-
-                    <strong>
-                        ${escapeHTML(item.line.raisonSociale)}
-                    </strong>
-
-                </td>
-
-
-                <td>
-                    ${escapeHTML(item.line.typeFacture || "—")}
-                </td>
-
-
-                <td>
-                    ${escapeHTML(item.line.dateLimite || "—")}
-                </td>
-
-
-                <td>
-
-                    <select
-                        class="agent-assignment-select"
-                        data-id="${escapeHTML(item.id)}"
-                    >
-
-                        ${createAgentOptions(
-                            item.assignedTo
-                        )}
-
-                    </select>
-
-                </td>
-
-
-                <td>
-
-                    ${
-                        item.assignedTo
-
-                        ? `
-                            <span class="status success-status">
-                                Affectée
-                            </span>
-                          `
-
-                        : `
-                            <span class="status pending-status">
-                                À affecter
-                            </span>
-                          `
-                    }
-
-                </td>
-
-            `;
-
-
-            table.appendChild(
-                row
-            );
-
-        }
-    );
-
-
-    /*
-        Checkbox events.
-    */
-
-    table
-        .querySelectorAll(
-            ".line-checkbox"
-        )
-        .forEach(
-            checkbox => {
-
-                checkbox.addEventListener(
-                    "change",
-                    event => {
-
-                        const item =
-                            state.lines.find(
-                                line =>
-                                    line.id ===
-                                    event.target.dataset.id
-                            );
-
-
-                        if (!item) {
-                            return;
-                        }
-
-
-                        item.selected =
-                            event.target.checked;
-
-
-                        saveState();
-
-                    }
-                );
-
-            }
-        );
-
-
-    /*
-        Assignment select events.
-    */
-
-    table
-        .querySelectorAll(
-            ".agent-assignment-select"
-        )
-        .forEach(
-            select => {
-
-                select.addEventListener(
-                    "change",
-                    event => {
-
-                        assignLine(
-                            event.target.dataset.id,
-                            event.target.value
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* ============================================================
-   ASSIGN SINGLE LINE
-============================================================ */
-
-function assignLine(
-    lineId,
-    agentId
-) {
-
-    const line =
-        state.lines.find(
-            item =>
-                item.id ===
-                lineId
-        );
-
-
-    if (!line) {
-        return;
-    }
-
-
-    line.assignedTo =
-        agentId || null;
-
-
-    /*
-        Any change means the previous validation
-        is no longer final.
-    */
-
-    state.validated =
-        false;
-
-
-    saveState();
-
-    renderAssignments();
-
-    renderDashboard();
-
-}
-
-
-/* ============================================================
-   SELECT ALL
-============================================================ */
-
-document.getElementById(
-    "selectAllLines"
-).addEventListener(
-    "change",
-    event => {
-
-        const checked =
-            event.target.checked;
-
-
-        state.lines.forEach(
-            line => {
-
-                line.selected =
-                    checked;
-
-            }
-        );
-
-
-        saveState();
-
-        renderAssignments();
-
-    }
-);
-
-
-/* ============================================================
-   BULK ASSIGNMENT
-============================================================ */
-
-function assignAllToSelectedAgent() {
-
-    const agentId =
-        document.getElementById(
-            "bulkAgentSelect"
-        ).value;
-
-
-    if (!agentId) {
-
-        showToast(
-            "Sélectionnez d'abord un agent."
-        );
-
-        return;
-
-    }
-
-
-    const selectedLines =
-        state.lines.filter(
-            line =>
-                line.selected
-        );
-
-
-    if (
-        selectedLines.length ===
-        0
-    ) {
-
-        showToast(
-            "Sélectionnez au moins une ligne."
-        );
-
-        return;
-
-    }
-
-
-    selectedLines.forEach(
-        line => {
-
-            line.assignedTo =
-                agentId;
-
-
-            line.selected =
-                false;
-
-        }
-    );
-
-
-    state.validated =
-        false;
-
-
-    document.getElementById(
-        "selectAllLines"
-    ).checked =
-        false;
-
-
-    saveState();
-
-    renderAll();
-
-
-    showToast(
-        `${selectedLines.length} ligne(s) affectée(s).`
-    );
-
-}
-
-
-/* ============================================================
-   VALIDATE ASSIGNMENTS
-============================================================ */
-
-async function validateAssignments() {
-
-    if (
-        state.lines.length ===
-        0
-    ) {
-
-        showToast(
-            "Aucune ligne à envoyer."
-        );
-
-        return;
-
-    }
-
-
-    const unassigned =
-        state.lines.filter(
-            line =>
-                !line.assignedTo
-        );
-
-
-    if (
-        unassigned.length >
-        0
-    ) {
-
-        showToast(
-            `${unassigned.length} ligne(s) ne sont pas encore affectée(s).`
-        );
-
-        return;
-
-    }
-
-
-    if (
-        !sharedFolderHandle
-    ) {
-
-        showToast(
-            "Connectez d'abord le dossier GestionTraitement."
-        );
-
-        return;
-
-    }
-
-
-    const button =
-        document.getElementById(
-            "validateAssignmentsButton"
-        );
-
-
-    const previousText =
-        button.textContent;
-
-
-    button.disabled =
-        true;
-
-
-    button.textContent =
-        "Envoi en cours...";
-
-
-    try {
-
-        const success =
-            await writeAgentFiles();
-
-
-        if (
-            !success
-        ) {
-
-            return;
-
-        }
-
-
-        state.validated =
-            true;
-
-
-        saveState();
-
-
-        showToast(
-            "✓ Affectations envoyées aux agents."
-        );
-
-    }
-    finally {
-
-        button.disabled =
-            false;
-
-
-        button.textContent =
-            previousText;
-
-    }
-
-}
-
-
-/* ============================================================
-   WRITE AGENT FILES
-============================================================ */
-
-async function writeAgentFiles() {
-
-    try {
-
-        /*
-            User selected:
-
-            GestionTraitement/
-
-            We create/find:
-
-            GestionTraitement/data/
-        */
-
-        const dataFolder =
-            await sharedFolderHandle
-                .getDirectoryHandle(
-                    "data",
-                    {
-                        create: true
-                    }
-                );
-
-
-        /*
-            Then:
-
-            GestionTraitement/data/agents/
-        */
-
-        const agentsFolder =
-            await dataFolder
-                .getDirectoryHandle(
-                    "agents",
-                    {
-                        create: true
-                    }
-                );
-
-
-        /*
-            IMPORTANT:
-
-            Generate one file for EVERY agent.
-
-            Even agents with zero assignments receive
-            an empty file.
-
-            This prevents old assignments from remaining
-            visible after reassignment.
-        */
-
-        for (
-            const agent
-            of state.agents
-        ) {
-
-            const assignedLines =
-                state.lines.filter(
-                    item =>
-                        item.assignedTo ===
-                        agent.id
-                );
-
-
-            const assignments =
-                assignedLines.map(
-                    item => ({
-
-                        id:
-                            item.id,
-
-                        assignedAt:
-                            new Date()
-                                .toLocaleString(
-                                    "fr-FR"
-                                ),
-
-                        source: {
-
-                            fileName:
-                                state.source.fileName,
-
-                            nomCSP:
-                                state.source.nomCSP,
-
-                            contratBAD:
-                                state.source.contratBAD,
-
-                            idtConnexion:
-                                state.source.idtConnexion,
-
-                            mdpCSP:
-                                state.source.mdpCSP,
-
-                            numeroAbonneCSP:
-                                state.source.numeroAbonneCSP,
-
-                            iban:
-                                state.source.iban
-
-                        },
-
-                        line: {
-
-                            ...item.line
-
-                        },
-
-                        status:
-                            "pending"
-
-                    })
-                );
-
-
-            const agentData = {
-
-                agent:
-                    agent.id,
-
-                agentName:
-                    agent.name,
-
-                sourceFile:
-                    state.source.fileName,
-
-                updatedAt:
-                    new Date()
-                        .toLocaleString(
-                            "fr-FR"
-                        ),
-
-                assignments:
-                    assignments
-
-            };
-
-
-            /*
-                JS instead of JSON because agent.html
-                can be opened directly from file://
-            */
-
-            const content =
-
-                "window.AGENT_DATA = "
-
-                +
-
-                JSON.stringify(
-                    agentData,
-                    null,
-                    2
-                )
-
-                +
-
-                ";\n";
-
-
-            const fileHandle =
-                await agentsFolder
-                    .getFileHandle(
-                        `${sanitizeFileName(agent.id)}.js`,
-                        {
-                            create: true
-                        }
-                    );
-
-
-            const writable =
-                await fileHandle
-                    .createWritable();
-
-
-            await writable.write(
-                content
-            );
-
-
-            await writable.close();
-
-        }
-
-
-        return true;
-
-    }
-    catch (error) {
-
-        console.error(
-            "Erreur écriture agents:",
-            error
-        );
-
-
-        showToast(
-            "Impossible d'écrire les fichiers agents."
-        );
-
-
-        return false;
-
-    }
-
-}
-
-
-/* ============================================================
-   AGENTS PAGE
-============================================================ */
-
-function renderAgents() {
-
-    const container =
-        document.getElementById(
-            "agentsList"
-        );
-
-
-    container.innerHTML =
-        "";
-
-
-    if (
-        state.agents.length ===
-        0
-    ) {
-
-        container.innerHTML =
-            "<p>Aucun agent configuré.</p>";
-
-        return;
-
-    }
-
-
-    state.agents.forEach(
-        agent => {
-
-            const assignmentCount =
-                state.lines.filter(
-                    line =>
-                        line.assignedTo ===
-                        agent.id
-                ).length;
-
-
-            const element =
-                document.createElement(
-                    "article"
-                );
-
-
-            element.className =
-                "agent-card";
-
-
-            element.innerHTML = `
-
-                <div class="agent-card-header">
-
-                    <div class="agent-large-avatar">
-
-                        ${escapeHTML(
-                            getInitials(
-                                agent.name
-                            )
-                        )}
-
+                    <div class="stat-icon">
+                        ≡
                     </div>
 
+                    <div>
+                        <span>Lignes importées</span>
+                        <strong id="totalLinesCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon warning-icon">
+                        !
+                    </div>
+
+                    <div>
+                        <span>Non affectées</span>
+                        <strong id="unassignedCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon success-icon">
+                        ✓
+                    </div>
+
+                    <div>
+                        <span>Affectées</span>
+                        <strong id="assignedCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon active-icon">
+                        ♙
+                    </div>
+
+                    <div>
+                        <span>Agents</span>
+                        <strong id="agentsCount">0</strong>
+                    </div>
+
+                </article>
+
+            </div>
+
+
+            <!-- LAST IMPORT -->
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+                        <h3>Dernier import</h3>
+                        <p>
+                            Informations du fichier actuellement chargé.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="dashboardImportInformation"
+                    class="info-grid"
+                >
+                </div>
+
+            </div>
+
+
+            <!-- DISTRIBUTION -->
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+                        <h3>Répartition par agent</h3>
+                        <p>
+                            Nombre de lignes actuellement affectées.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="agentDistribution"
+                    class="agent-distribution"
+                >
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             IMPORT
+        ================================================== -->
+
+        <section
+            id="import"
+            class="page"
+        >
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+                        <h3>Importer un fichier Excel</h3>
+                        <p>
+                            Sélectionnez le fichier source contenant les
+                            informations CSP et les lignes clients.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="dropZone"
+                    class="import-zone"
+                    onclick="openImportDialog()"
+                >
+
+                    <div class="import-icon">
+                        ⇧
+                    </div>
+
+                    <h3>
+                        Sélectionner un fichier Excel
+                    </h3>
+
+                    <p>
+                        Formats acceptés : XLSX, XLS, XLSM
+                    </p>
 
                     <button
-                        class="delete-agent-btn"
-                        title="Supprimer"
-                        data-agent="${escapeHTML(agent.id)}"
+                        class="primary-btn"
+                        type="button"
                     >
-                        ×
+                        Parcourir
                     </button>
 
                 </div>
 
 
-                <h3>
-                    ${escapeHTML(agent.name)}
-                </h3>
+                <input
+                    id="excelInput"
+                    type="file"
+                    accept=".xlsx,.xls,.xlsm"
+                    hidden
+                >
+
+            </div>
 
 
-                <span class="agent-id">
+            <!-- IMPORT RESULT -->
 
-                    ${escapeHTML(agent.id)}
+            <div
+                id="importResult"
+                class="hidden"
+            >
 
-                </span>
+                <div class="card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <h3>Fichier importé</h3>
+                            <p id="importFileName">—</p>
+                        </div>
+
+                        <span class="status success-status">
+                            Importé
+                        </span>
+
+                    </div>
 
 
-                <div class="agent-stat">
-
-                    <span>Lignes affectées</span>
-
-                    <strong>
-                        ${assignmentCount}
-                    </strong>
+                    <div
+                        id="sourceInformation"
+                        class="info-grid"
+                    >
+                    </div>
 
                 </div>
 
 
-                <div class="agent-link">
+                <div class="card">
 
-                    agent.html?agent=${escapeHTML(agent.id)}
+                    <div class="card-header">
+
+                        <div>
+                            <h3>Lignes détectées</h3>
+                            <p>
+                                Vérifiez les données avant l'affectation.
+                            </p>
+                        </div>
+
+
+                        <span
+                            id="importedRowsCount"
+                            class="pill"
+                        >
+                            0 ligne
+                        </span>
+
+                    </div>
+
+
+                    <div class="table-wrapper">
+
+                        <table>
+
+                            <thead>
+
+                            <tr>
+                                <th>SIRET</th>
+                                <th>Raison sociale</th>
+                                <th>Type</th>
+                                <th>N° Abonné</th>
+                                <th>Identifiant</th>
+                                <th>Contrat BAD</th>
+                                <th>Date limite</th>
+                            </tr>
+
+                            </thead>
+
+
+                            <tbody id="importPreviewTable">
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+
+                    <div class="card-footer">
+
+                        <button
+                            class="primary-btn"
+                            onclick="goToAssignments()"
+                        >
+                            Passer aux affectations →
+                        </button>
+
+                    </div>
 
                 </div>
 
-            `;
+            </div>
 
+        </section>
 
-            container.appendChild(
-                element
-            );
 
-        }
-    );
+        <!-- =================================================
+             ASSIGNMENTS
+        ================================================== -->
 
+        <section
+            id="assignments"
+            class="page"
+        >
 
-    container
-        .querySelectorAll(
-            ".delete-agent-btn"
-        )
-        .forEach(
-            button => {
+            <div class="card">
 
-                button.addEventListener(
-                    "click",
-                    () => {
+                <div class="card-header assignment-header">
 
-                        removeAgent(
-                            button.dataset.agent
-                        );
+                    <div>
 
-                    }
-                );
+                        <h3>Affectation des lignes</h3>
 
-            }
-        );
+                        <p>
+                            Sélectionnez un agent pour chaque ligne importée.
+                        </p>
 
-}
+                    </div>
 
 
-/* ============================================================
-   ADD AGENT
-============================================================ */
+                    <div class="assignment-actions">
 
-function showAddAgentForm() {
+                        <select id="bulkAgentSelect">
+                            <option value="">
+                                Affectation en masse...
+                            </option>
+                        </select>
 
-    document.getElementById(
-        "addAgentForm"
-    ).classList.remove(
-        "hidden"
-    );
 
+                        <button
+                            class="secondary-btn"
+                            onclick="assignAllToSelectedAgent()"
+                        >
+                            Affecter
+                        </button>
 
-    document.getElementById(
-        "newAgentId"
-    ).focus();
 
-}
+                        <button
+                            id="validateAssignmentsButton"
+                            class="primary-btn"
+                            onclick="validateAssignments()"
+                        >
+                            ✓ Valider les affectations
+                        </button>
 
+                    </div>
 
-function hideAddAgentForm() {
+                </div>
 
-    document.getElementById(
-        "addAgentForm"
-    ).classList.add(
-        "hidden"
-    );
 
+                <div class="assignment-toolbar">
 
-    document.getElementById(
-        "newAgentId"
-    ).value =
-        "";
+                    <input
+                        id="assignmentSearch"
+                        type="search"
+                        placeholder="Rechercher SIRET ou raison sociale..."
+                    >
 
 
-    document.getElementById(
-        "newAgentName"
-    ).value =
-        "";
+                    <select id="assignmentFilter">
 
-}
+                        <option value="all">
+                            Toutes les lignes
+                        </option>
 
+                        <option value="unassigned">
+                            Non affectées
+                        </option>
 
-function addAgent() {
+                        <option value="assigned">
+                            Affectées
+                        </option>
 
-    const id =
-        document.getElementById(
-            "newAgentId"
-        )
-        .value
-        .trim()
-        .toUpperCase()
-        .replace(
-            /\s+/g,
-            ""
-        );
+                    </select>
 
+                </div>
 
-    const name =
-        document.getElementById(
-            "newAgentName"
-        )
-        .value
-        .trim();
 
+                <div class="table-wrapper">
 
-    if (
-        !id
-    ) {
+                    <table>
 
-        showToast(
-            "Saisissez l'identifiant de l'agent."
-        );
+                        <thead>
 
-        return;
+                        <tr>
+                            <th>
+                                <input
+                                    id="selectAllLines"
+                                    type="checkbox"
+                                >
+                            </th>
 
-    }
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>Date limite</th>
+                            <th>Agent</th>
+                            <th>Statut</th>
+                        </tr>
 
+                        </thead>
 
-    const exists =
-        state.agents.some(
-            agent =>
-                agent.id ===
-                id
-        );
 
+                        <tbody id="assignmentTable">
+                        </tbody>
 
-    if (
-        exists
-    ) {
+                    </table>
 
-        showToast(
-            "Cet agent existe déjà."
-        );
+                </div>
 
-        return;
+            </div>
 
-    }
+        </section>
 
 
-    state.agents.push({
+        <!-- =================================================
+             AGENTS
+        ================================================== -->
 
-        id,
+        <section
+            id="agents"
+            class="page"
+        >
 
-        name:
-            name || id
+            <div class="card">
 
-    });
+                <div class="card-header">
 
+                    <div>
+                        <h3>Agents</h3>
+                        <p>
+                            Gérez les agents disponibles pour les affectations.
+                        </p>
+                    </div>
 
-    state.validated =
-        false;
 
+                    <button
+                        class="primary-btn"
+                        onclick="showAddAgentForm()"
+                    >
+                        + Ajouter un agent
+                    </button>
 
-    saveState();
+                </div>
 
-    hideAddAgentForm();
 
-    renderAll();
+                <div
+                    id="addAgentForm"
+                    class="add-agent-form hidden"
+                >
 
+                    <div class="form-field">
 
-    showToast(
-        "Agent ajouté."
-    );
+                        <label for="newAgentId">
+                            Identifiant
+                        </label>
 
-}
+                        <input
+                            id="newAgentId"
+                            type="text"
+                            placeholder="Ex : HAMDANMO"
+                        >
 
+                    </div>
 
-/* ============================================================
-   REMOVE AGENT
-============================================================ */
 
-function removeAgent(
-    agentId
-) {
+                    <div class="form-field">
 
-    const agent =
-        state.agents.find(
-            item =>
-                item.id ===
-                agentId
-        );
+                        <label for="newAgentName">
+                            Nom affiché
+                        </label>
 
+                        <input
+                            id="newAgentName"
+                            type="text"
+                            placeholder="Ex : Mohamed Hamdan"
+                        >
 
-    if (!agent) {
-        return;
-    }
+                    </div>
 
 
-    const assignedLines =
-        state.lines.filter(
-            line =>
-                line.assignedTo ===
-                agentId
-        );
+                    <button
+                        class="primary-btn"
+                        onclick="addAgent()"
+                    >
+                        Ajouter
+                    </button>
 
 
-    if (
-        assignedLines.length >
-        0
-    ) {
+                    <button
+                        class="secondary-btn"
+                        onclick="hideAddAgentForm()"
+                    >
+                        Annuler
+                    </button>
 
-        const confirmation =
-            confirm(
-                `${agent.name} possède ${assignedLines.length} ligne(s) affectée(s).\n\n` +
-                "Ces lignes redeviendront non affectées.\n\n" +
-                "Continuer ?"
-            );
+                </div>
 
 
-        if (
-            !confirmation
-        ) {
+                <div
+                    id="agentsList"
+                    class="agents-grid"
+                >
+                </div>
 
-            return;
+            </div>
 
-        }
+        </section>
 
-    }
+    </main>
 
+</div>
 
-    /*
-        Unassign lines.
-    */
 
-    state.lines.forEach(
-        line => {
+<!-- =========================================================
+     TOAST
+========================================================== -->
 
-            if (
-                line.assignedTo ===
-                agentId
-            ) {
+<div
+    id="toast"
+    class="toast"
+>
+</div>
 
-                line.assignedTo =
-                    null;
 
-            }
+<!-- =========================================================
+     SHEETJS
+========================================================== -->
 
-        }
-    );
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+<script src="js/manager.js"></script>
 
-    /*
-        Remove agent.
-    */
+</body>
 
-    state.agents =
-        state.agents.filter(
-            item =>
-                item.id !==
-                agentId
-        );
-
-
-    state.validated =
-        false;
-
-
-    saveState();
-
-    renderAll();
-
-
-    showToast(
-        "Agent supprimé."
-    );
-
-}
-
-
-/* ============================================================
-   SEARCH / FILTER EVENTS
-============================================================ */
-
-document.getElementById(
-    "assignmentSearch"
-).addEventListener(
-    "input",
-    renderAssignments
-);
-
-
-document.getElementById(
-    "assignmentFilter"
-).addEventListener(
-    "change",
-    renderAssignments
-);
-
-
-/* ============================================================
-   OPTIONAL DRAG AND DROP
-============================================================ */
-
-const dropZone =
-    document.getElementById(
-        "dropZone"
-    );
-
-
-[
-    "dragenter",
-    "dragover"
-].forEach(
-    eventName => {
-
-        dropZone.addEventListener(
-            eventName,
-            event => {
-
-                event.preventDefault();
-
-                dropZone.classList.add(
-                    "dragging"
-                );
-
-            }
-        );
-
-    }
-);
-
-
-[
-    "dragleave",
-    "drop"
-].forEach(
-    eventName => {
-
-        dropZone.addEventListener(
-            eventName,
-            event => {
-
-                event.preventDefault();
-
-                dropZone.classList.remove(
-                    "dragging"
-                );
-
-            }
-        );
-
-    }
-);
-
-
-dropZone.addEventListener(
-    "drop",
-    event => {
-
-        const file =
-            event.dataTransfer.files[0];
-
-
-        if (!file) {
-            return;
-        }
-
-
-        importExcelFile(
-            file
-        );
-
-    }
-);
-
-
-/* ============================================================
-   HELPERS
-============================================================ */
-
-function sanitizeFileName(
-    value
-) {
-
-    return String(
-        value
-    )
-    .replace(
-        /[<>:"/\\|?*]/g,
-        "_"
-    )
-    .trim();
-
-}
-
-
-function getInitials(
-    name
-) {
-
-    const words =
-        String(
-            name || ""
-        )
-        .trim()
-        .split(
-            /\s+/
-        )
-        .filter(
-            Boolean
-        );
-
-
-    if (
-        words.length ===
-        0
-    ) {
-
-        return "--";
-
-    }
-
-
-    if (
-        words.length ===
-        1
-    ) {
-
-        return words[0]
-            .substring(
-                0,
-                2
-            )
-            .toUpperCase();
-
-    }
-
-
-    return (
-        words[0][0]
-        +
-        words[
-            words.length - 1
-        ][0]
-    )
-    .toUpperCase();
-
-}
-
-
-function escapeHTML(
-    value
-) {
-
-    return String(
-        value ?? ""
-    )
-    .replaceAll(
-        "&",
-        "&amp;"
-    )
-    .replaceAll(
-        "<",
-        "&lt;"
-    )
-    .replaceAll(
-        ">",
-        "&gt;"
-    )
-    .replaceAll(
-        '"',
-        "&quot;"
-    )
-    .replaceAll(
-        "'",
-        "&#039;"
-    );
-
-}
-
-
-/* ============================================================
-   TOAST
-============================================================ */
-
-let toastTimer;
-
-
-function showToast(
-    message
-) {
-
-    const toast =
-        document.getElementById(
-            "toast"
-        );
-
-
-    toast.textContent =
-        message;
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        toastTimer
-    );
-
-
-    toastTimer =
-        setTimeout(
-            () => {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2600
-        );
-
-}
-
-
-/* ============================================================
-   RENDER EVERYTHING
-============================================================ */
-
-function renderAll() {
-
-    updateCounters();
-
-    renderDashboard();
-
-    renderImportPage();
-
-    renderAssignments();
-
-    renderAgents();
-
-}
-
-
-/* ============================================================
-   START APPLICATION
-============================================================ */
-
-function startApplication() {
-
-    renderDate();
-
-    renderAll();
-
-}
-
-
-startApplication();
+</html>
