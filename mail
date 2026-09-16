@@ -1,73 +1,141 @@
-Yes. We should rebuild it cleanly rather than keep modifying the first prototype.
+Yes. Now we build the Manager V1 around the same structure as the Agent app.
 
-For the Agent interface, I’d structure the workflow as four states: Dashboard → À traiter → Traitement en cours → Historique. The agent never imports anything and never chooses another agent. Their page is strictly for processing assigned lines.
+For this first Manager version:
 
-Before the Manager is connected, we’ll keep one realistic test record in JavaScript. Later, we replace only the data-loading part; the Agent UI/workflow won’t need to be rewritten.
+Manager imports .xlsx/.xls.
 
-1. agent.html
+JavaScript reads the Excel in the browser.
+
+It extracts the general CSP/source information.
+
+It detects client rows.
+
+Manager has an editable agent list.
+
+Each line can be assigned individually.
+
+Multiple lines can be selected and assigned at once.
+
+Dashboard shows totals.
+
+Manager can filter by agent/status.
+
+Assignments are saved locally for now.
+
+The next step will be the shared-folder bridge Manager → Agent, so don't yet expect this version to magically update agent.html on another PC.
+
+
+For Excel reading, download the browser build of SheetJS xlsx.full.min.js and place it in libs/. [SheetJS official website](https://sheetjs.com/?utm_source=chatgpt.com)
+
+Your project becomes:
+
+GestionTraitement/
+│
+├── agent.html
+├── agent.css
+├── agent.js
+│
+├── manager.html
+├── manager.css
+├── manager.js
+│
+└── libs/
+    └── xlsx.full.min.js
+
+1. manager.html
 
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Espace Agent</title>
+    <title>Espace Manager</title>
 
-    <link rel="stylesheet" href="agent.css">
+    <link rel="stylesheet" href="manager.css">
 </head>
 
 <body>
 
 <div class="app">
 
-    <!-- =========================
+    <!-- ==================================================
          SIDEBAR
-    ========================== -->
+    =================================================== -->
 
     <aside class="sidebar">
 
         <div class="brand">
-            <div class="brand-logo">GT</div>
+
+            <div class="brand-logo">
+                GT
+            </div>
 
             <div class="brand-text">
                 <strong>Gestion Traitement</strong>
-                <span>Espace Agent</span>
+                <span>Espace Manager</span>
             </div>
+
         </div>
 
 
         <nav class="navigation">
 
-            <button class="nav-btn active" data-page="dashboard">
+            <button
+                class="nav-btn active"
+                data-page="dashboard"
+            >
                 <span class="nav-icon">▦</span>
                 <span>Tableau de bord</span>
             </button>
 
-            <button class="nav-btn" data-page="pending">
-                <span class="nav-icon">☷</span>
-                <span>À traiter</span>
 
-                <span id="navPendingCount" class="nav-count">0</span>
+            <button
+                class="nav-btn"
+                data-page="import"
+            >
+                <span class="nav-icon">⇧</span>
+                <span>Import Excel</span>
             </button>
 
-            <button class="nav-btn" data-page="history">
-                <span class="nav-icon">◷</span>
-                <span>Historique</span>
+
+            <button
+                class="nav-btn"
+                data-page="assignments"
+            >
+                <span class="nav-icon">⇄</span>
+                <span>Affectations</span>
+
+                <span
+                    id="unassignedNavCount"
+                    class="nav-count"
+                >
+                    0
+                </span>
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="agents"
+            >
+                <span class="nav-icon">♙</span>
+                <span>Agents</span>
             </button>
 
         </nav>
 
 
-        <div class="agent-profile">
+        <div class="manager-profile">
 
-            <div class="avatar" id="agentInitials">
-                AM
+            <div class="avatar">
+                MG
             </div>
 
-            <div class="agent-profile-text">
-                <strong id="agentName">HAMDANMO</strong>
-                <span>Agent</span>
+            <div>
+                <strong>Manager</strong>
+                <span>Administration</span>
             </div>
 
         </div>
@@ -75,33 +143,42 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
     </aside>
 
 
-    <!-- =========================
+    <!-- ==================================================
          MAIN
-    ========================== -->
+    =================================================== -->
 
     <main class="main">
+
+        <!-- TOP BAR -->
 
         <header class="topbar">
 
             <div>
-                <h1 id="pageTitle">Tableau de bord</h1>
+
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
+
                 <p id="pageSubtitle">
-                    Suivez et traitez vos lignes affectées.
+                    Vue générale des affectations.
                 </p>
+
             </div>
 
-            <div class="topbar-right">
 
-                <div class="date-box" id="currentDate"></div>
+            <div class="topbar-actions">
 
-                <div class="agent-mini">
-                    <div class="mini-avatar" id="topInitials">AM</div>
+                <div
+                    id="currentDate"
+                    class="date-box"
+                ></div>
 
-                    <div>
-                        <strong id="topAgentName">HAMDANMO</strong>
-                        <span>Agent</span>
-                    </div>
-                </div>
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
+                >
+                    + Importer un fichier
+                </button>
 
             </div>
 
@@ -112,73 +189,175 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
              DASHBOARD
         =================================================== -->
 
-        <section id="dashboard" class="page active">
+        <section
+            id="dashboard"
+            class="page active"
+        >
 
-            <div class="welcome">
+            <div class="stats-grid">
 
-                <div>
-                    <span class="eyebrow">ESPACE AGENT</span>
-                    <h2>
-                        Bonjour,
-                        <span id="welcomeAgent">HAMDANMO</span>
-                    </h2>
+                <article class="stat-card">
 
-                    <p>
-                        Voici l'état de vos traitements.
-                    </p>
-                </div>
+                    <div class="stat-icon blue">
+                        ≡
+                    </div>
 
-                <button class="primary-btn" onclick="openPendingPage()">
-                    Commencer le traitement →
-                </button>
+                    <div>
+                        <span>Lignes importées</span>
+                        <strong id="totalLines">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon orange">
+                        !
+                    </div>
+
+                    <div>
+                        <span>Non affectées</span>
+                        <strong id="unassignedCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon green">
+                        ✓
+                    </div>
+
+                    <div>
+                        <span>Affectées</span>
+                        <strong id="assignedCount">0</strong>
+                    </div>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <div class="stat-icon purple">
+                        ♙
+                    </div>
+
+                    <div>
+                        <span>Agents</span>
+                        <strong id="agentCount">0</strong>
+                    </div>
+
+                </article>
 
             </div>
 
 
-            <div class="stats">
-
-                <article class="stat-card">
-                    <div class="stat-icon warning-icon">☷</div>
-
-                    <div>
-                        <span>À traiter</span>
-                        <strong id="pendingCount">0</strong>
-                    </div>
-                </article>
-
-
-                <article class="stat-card">
-                    <div class="stat-icon active-icon">↻</div>
-
-                    <div>
-                        <span>En cours</span>
-                        <strong id="processingCount">0</strong>
-                    </div>
-                </article>
-
-
-                <article class="stat-card">
-                    <div class="stat-icon success-icon">✓</div>
-
-                    <div>
-                        <span>Terminées</span>
-                        <strong id="completedCount">0</strong>
-                    </div>
-                </article>
-
-            </div>
-
+            <!-- CURRENT FILE -->
 
             <div class="card">
 
                 <div class="card-header">
 
                     <div>
-                        <h3>Prochaines lignes à traiter</h3>
-                        <p>Vos dernières lignes affectées.</p>
+                        <h2>Fichier actuel</h2>
+
+                        <p>
+                            Dernier fichier Excel importé.
+                        </p>
                     </div>
 
-                    <button class="text-btn" onclick="openPendingPage()">
+                    <span
+                        id="fileStatus"
+                        class="status neutral-status"
+                    >
+                        Aucun fichier
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="noFileDashboard"
+                    class="empty-state small"
+                >
+
+                    <div class="empty-icon">
+                        ⇧
+                    </div>
+
+                    <h3>Aucun fichier importé</h3>
+
+                    <p>
+                        Importez un fichier Excel pour commencer.
+                    </p>
+
+                    <button
+                        class="primary-btn"
+                        onclick="openImportDialog()"
+                    >
+                        Importer Excel
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="currentFileDashboard"
+                    class="hidden"
+                >
+
+                    <div class="file-summary">
+
+                        <div class="file-icon">
+                            XL
+                        </div>
+
+                        <div class="file-details">
+
+                            <strong id="dashboardFileName">
+                                -
+                            </strong>
+
+                            <span id="dashboardFileMeta">
+                                -
+                            </span>
+
+                        </div>
+
+                        <button
+                            class="secondary-btn"
+                            onclick="showPage('assignments')"
+                        >
+                            Voir les affectations →
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- RECENT LINES -->
+
+            <div class="card">
+
+                <div class="card-header">
+
+                    <div>
+                        <h2>Lignes importées</h2>
+
+                        <p>
+                            Aperçu des premières lignes du fichier.
+                        </p>
+                    </div>
+
+                    <button
+                        class="text-btn"
+                        onclick="showPage('assignments')"
+                    >
                         Voir toutes →
                     </button>
 
@@ -190,16 +369,20 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
                     <table>
 
                         <thead>
+
                         <tr>
                             <th>SIRET</th>
                             <th>Raison sociale</th>
-                            <th>Type facture</th>
+                            <th>Type</th>
                             <th>Date limite</th>
+                            <th>Agent</th>
                             <th>Statut</th>
                         </tr>
+
                         </thead>
 
-                        <tbody id="dashboardTable"></tbody>
+                        <tbody id="dashboardLines">
+                        </tbody>
 
                     </table>
 
@@ -211,282 +394,179 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
 
 
         <!-- ==================================================
-             PENDING
+             IMPORT
         =================================================== -->
 
-        <section id="pending" class="page">
+        <section
+            id="import"
+            class="page"
+        >
 
-            <div class="workspace">
+            <!-- DROP ZONE -->
 
-                <!-- LEFT LIST -->
+            <div
+                id="dropZone"
+                class="upload-zone"
+            >
 
-                <div class="card queue-card">
+                <div class="upload-icon">
+                    ⇧
+                </div>
+
+                <h2>Importer le fichier Excel</h2>
+
+                <p>
+                    Glissez votre fichier ici ou sélectionnez-le
+                    depuis votre ordinateur.
+                </p>
+
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()"
+                >
+                    Sélectionner un fichier
+                </button>
+
+                <span>
+                    Formats acceptés : XLSX / XLS
+                </span>
+
+            </div>
+
+
+            <input
+                id="excelInput"
+                type="file"
+                accept=".xlsx,.xls"
+                hidden
+            >
+
+
+            <!-- IMPORT RESULT -->
+
+            <div
+                id="importResult"
+                class="hidden"
+            >
+
+                <div class="import-success">
+
+                    <div class="success-circle">
+                        ✓
+                    </div>
+
+                    <div>
+
+                        <strong id="importedFileName">
+                            -
+                        </strong>
+
+                        <span id="importedFileInfo">
+                            -
+                        </span>
+
+                    </div>
+
+                    <span class="status success-status">
+                        Importé
+                    </span>
+
+                </div>
+
+
+                <!-- SOURCE INFO -->
+
+                <div class="card">
 
                     <div class="card-header">
 
                         <div>
-                            <h3>Lignes à traiter</h3>
+                            <h2>Informations fichier source</h2>
+
                             <p>
-                                Sélectionnez une ligne pour afficher son détail.
+                                Informations générales détectées
+                                dans le fichier Excel.
                             </p>
                         </div>
 
-                        <span id="queueCount" class="pill">
-                            0
+                    </div>
+
+
+                    <div
+                        id="sourceInfoGrid"
+                        class="source-grid"
+                    >
+                    </div>
+
+                </div>
+
+
+                <!-- DETECTED LINES -->
+
+                <div class="card">
+
+                    <div class="card-header">
+
+                        <div>
+
+                            <h2>Lignes détectées</h2>
+
+                            <p>
+                                Vérifiez les données avant de procéder
+                                aux affectations.
+                            </p>
+
+                        </div>
+
+                        <span
+                            id="detectedCount"
+                            class="count-pill"
+                        >
+                            0 ligne
                         </span>
 
                     </div>
 
 
-                    <div class="queue-search">
-                        <input
-                            id="pendingSearch"
-                            type="search"
-                            placeholder="Rechercher SIRET ou raison sociale..."
-                        >
-                    </div>
+                    <div class="table-wrapper">
 
+                        <table>
 
-                    <div id="pendingList" class="pending-list"></div>
+                            <thead>
 
-                </div>
+                            <tr>
+                                <th>#</th>
+                                <th>SIRET</th>
+                                <th>Raison sociale</th>
+                                <th>Type facture</th>
+                                <th>Date limite</th>
+                            </tr>
 
+                            </thead>
 
-                <!-- RIGHT -->
+                            <tbody id="importPreviewTable">
+                            </tbody>
 
-                <div class="details-column">
-
-
-                    <!-- NO SELECTION -->
-
-                    <div id="emptySelection" class="card empty-state">
-
-                        <div class="empty-state-icon">☷</div>
-
-                        <h3>Sélectionnez une ligne</h3>
-
-                        <p>
-                            Les informations nécessaires au traitement
-                            apparaîtront ici.
-                        </p>
+                        </table>
 
                     </div>
 
 
-                    <!-- DETAILS -->
-
-                    <div id="selectedDetails" class="hidden">
-
-
-                        <!-- SELECTED CLIENT HEADER -->
-
-                        <div class="selected-client">
-
-                            <div>
-
-                                <span class="eyebrow">
-                                    LIGNE SÉLECTIONNÉE
-                                </span>
-
-                                <h2 id="selectedCompany">—</h2>
-
-                                <span id="selectedSiret" class="selected-siret">
-                                    —
-                                </span>
-
-                            </div>
-
-                            <span class="status pending-status">
-                                À traiter
-                            </span>
-
-                        </div>
-
-
-                        <!-- SOURCE -->
-
-                        <div class="card">
-
-                            <div class="section-heading">
-
-                                <div class="heading-icon">⌁</div>
-
-                                <div>
-                                    <h3>Informations fichier source</h3>
-                                    <p>
-                                        Informations communes provenant du fichier Manager.
-                                    </p>
-                                </div>
-
-                            </div>
-
-                            <div id="sourceInformation" class="info-grid"></div>
-
-                        </div>
-
-
-                        <!-- LINE -->
-
-                        <div class="card">
-
-                            <div class="section-heading">
-
-                                <div class="heading-icon">≡</div>
-
-                                <div>
-                                    <h3>Informations de la ligne</h3>
-                                    <p>
-                                        Informations propres au client sélectionné.
-                                    </p>
-                                </div>
-
-                            </div>
-
-                            <div id="lineInformation" class="info-grid"></div>
-
-                        </div>
-
+                    <div class="import-actions">
 
                         <button
-                            id="takeButton"
-                            class="take-button"
-                            onclick="takeSelectedLine()"
+                            class="secondary-btn"
+                            onclick="resetImport()"
                         >
-                            Prendre en charge
+                            Annuler
                         </button>
 
-
-                        <!-- ===================================
-                             TREATMENT FORM
-                        ==================================== -->
-
-                        <div id="treatmentForm" class="card treatment-card hidden">
-
-                            <div class="treatment-header">
-
-                                <div>
-
-                                    <span class="processing-dot"></span>
-
-                                    <div>
-                                        <h3>Traitement en cours</h3>
-                                        <p>
-                                            Complétez les informations ci-dessous.
-                                        </p>
-                                    </div>
-
-                                </div>
-
-                                <span class="status processing-status">
-                                    En cours
-                                </span>
-
-                            </div>
-
-
-                            <div class="form-grid">
-
-                                <div class="form-field">
-                                    <label for="subscriberNumber">
-                                        N° Abonné
-                                    </label>
-
-                                    <input
-                                        id="subscriberNumber"
-                                        type="text"
-                                        placeholder="Saisir le numéro d'abonné"
-                                    >
-                                </div>
-
-
-                                <div class="form-field">
-                                    <label for="idt">
-                                        IDT
-                                    </label>
-
-                                    <input
-                                        id="idt"
-                                        type="text"
-                                        placeholder="Saisir l'IDT"
-                                    >
-                                </div>
-
-
-                                <div class="form-field">
-                                    <label for="password">
-                                        MDP
-                                    </label>
-
-                                    <input
-                                        id="password"
-                                        type="text"
-                                        placeholder="Saisir le MDP"
-                                    >
-                                </div>
-
-
-                                <div class="form-field">
-                                    <label for="badContract">
-                                        Contrat BAD
-                                    </label>
-
-                                    <input
-                                        id="badContract"
-                                        type="text"
-                                        placeholder="Saisir le contrat BAD"
-                                    >
-                                </div>
-
-
-                                <div class="form-field">
-                                    <label for="csp">
-                                        CSP
-                                    </label>
-
-                                    <input
-                                        id="csp"
-                                        type="text"
-                                        placeholder="Saisir le CSP"
-                                    >
-                                </div>
-
-
-                                <div class="form-field full-width">
-
-                                    <label for="comment">
-                                        Commentaire
-                                        <span class="optional">(optionnel)</span>
-                                    </label>
-
-                                    <textarea
-                                        id="comment"
-                                        placeholder="Ajouter un commentaire..."
-                                    ></textarea>
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="form-actions">
-
-                                <button
-                                    class="secondary-btn"
-                                    onclick="cancelTreatment()"
-                                >
-                                    Annuler
-                                </button>
-
-                                <button
-                                    class="complete-btn"
-                                    onclick="completeTreatment()"
-                                >
-                                    ✓ Terminer
-                                </button>
-
-                            </div>
-
-                        </div>
+                        <button
+                            class="primary-btn"
+                            onclick="goToAssignments()"
+                        >
+                            Continuer vers les affectations →
+                        </button>
 
                     </div>
 
@@ -498,51 +578,262 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
 
 
         <!-- ==================================================
-             HISTORY
+             ASSIGNMENTS
         =================================================== -->
 
-        <section id="history" class="page">
+        <section
+            id="assignments"
+            class="page"
+        >
+
+            <div class="assignment-summary">
+
+                <div>
+                    <span>Total</span>
+                    <strong id="assignmentTotal">0</strong>
+                </div>
+
+                <div>
+                    <span>Affectées</span>
+                    <strong id="assignmentAssigned">0</strong>
+                </div>
+
+                <div>
+                    <span>Non affectées</span>
+                    <strong id="assignmentUnassigned">0</strong>
+                </div>
+
+            </div>
+
+
+            <!-- TOOLBAR -->
 
             <div class="card">
 
-                <div class="card-header history-header">
+                <div class="assignment-toolbar">
 
-                    <div>
-                        <h3>Historique des traitements</h3>
-                        <p>
-                            Retrouvez les lignes que vous avez terminées.
-                        </p>
+                    <div class="toolbar-left">
+
+                        <input
+                            id="assignmentSearch"
+                            class="search-input"
+                            type="search"
+                            placeholder="Rechercher SIRET ou raison sociale..."
+                        >
+
+
+                        <select
+                            id="agentFilter"
+                            class="filter-select"
+                        >
+                            <option value="">
+                                Tous les agents
+                            </option>
+
+                            <option value="unassigned">
+                                Non affectées
+                            </option>
+
+                        </select>
+
                     </div>
 
-                    <input
-                        id="historySearch"
-                        class="history-search"
-                        type="search"
-                        placeholder="Rechercher..."
-                    >
+
+                    <div class="bulk-assignment">
+
+                        <span>
+                            <strong id="selectedCount">0</strong>
+                            sélectionnée(s)
+                        </span>
+
+                        <select
+                            id="bulkAgent"
+                            class="filter-select"
+                        >
+                            <option value="">
+                                Affecter à...
+                            </option>
+                        </select>
+
+                        <button
+                            id="bulkAssignButton"
+                            class="primary-btn"
+                            onclick="assignSelectedLines()"
+                            disabled
+                        >
+                            Affecter
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- TABLE -->
+
+            <div class="card assignment-card">
+
+                <div class="table-wrapper">
+
+                    <table class="assignment-table">
+
+                        <thead>
+
+                        <tr>
+
+                            <th class="checkbox-column">
+
+                                <input
+                                    id="selectAll"
+                                    type="checkbox"
+                                >
+
+                            </th>
+
+                            <th>SIRET</th>
+
+                            <th>Raison sociale</th>
+
+                            <th>Type</th>
+
+                            <th>Date limite</th>
+
+                            <th>Affectation</th>
+
+                            <th>Statut</th>
+
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="assignmentTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <div class="bottom-actions">
+
+                <div>
+
+                    <strong id="validationMessage">
+                        Affectez toutes les lignes avant validation.
+                    </strong>
+
+                    <span>
+                        Les affectations pourront ensuite être distribuées
+                        aux agents.
+                    </span>
+
+                </div>
+
+                <button
+                    id="validateAssignmentsButton"
+                    class="validate-btn"
+                    onclick="validateAssignments()"
+                    disabled
+                >
+                    ✓ Valider les affectations
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- ==================================================
+             AGENTS
+        =================================================== -->
+
+        <section
+            id="agents"
+            class="page"
+        >
+
+            <div class="agents-layout">
+
+                <!-- ADD -->
+
+                <div class="card">
+
+                    <div class="card-header">
+
+                        <div>
+                            <h2>Ajouter un agent</h2>
+
+                            <p>
+                                Les agents apparaîtront dans
+                                les listes d'affectation.
+                            </p>
+                        </div>
+
+                    </div>
+
+
+                    <div class="agent-form">
+
+                        <label for="newAgentName">
+                            Nom de l'agent
+                        </label>
+
+                        <div>
+
+                            <input
+                                id="newAgentName"
+                                type="text"
+                                placeholder="Ex : HAMDANMO"
+                            >
+
+                            <button
+                                class="primary-btn"
+                                onclick="addAgent()"
+                            >
+                                + Ajouter
+                            </button>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
 
-                <div class="table-wrapper">
+                <!-- LIST -->
 
-                    <table>
+                <div class="card">
 
-                        <thead>
-                        <tr>
-                            <th>SIRET</th>
-                            <th>Raison sociale</th>
-                            <th>Type</th>
-                            <th>N° Abonné</th>
-                            <th>IDT</th>
-                            <th>Contrat BAD</th>
-                            <th>Terminé le</th>
-                        </tr>
-                        </thead>
+                    <div class="card-header">
 
-                        <tbody id="historyTable"></tbody>
+                        <div>
+                            <h2>Liste des agents</h2>
 
-                    </table>
+                            <p>
+                                Agents disponibles pour les affectations.
+                            </p>
+                        </div>
+
+                        <span
+                            id="agentsListCount"
+                            class="count-pill"
+                        >
+                            0 agent
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        id="agentsList"
+                        class="agents-list"
+                    >
+                    </div>
 
                 </div>
 
@@ -555,17 +846,28 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
 </div>
 
 
-<!-- TOAST -->
+<!-- ==================================================
+     TOAST
+=================================================== -->
 
-<div id="toast" class="toast"></div>
+<div
+    id="toast"
+    class="toast"
+></div>
 
 
-<script src="agent.js"></script>
+<!-- ==================================================
+     XLSX
+=================================================== -->
+
+<script src="libs/xlsx.full.min.js"></script>
+
+<script src="manager.js"></script>
 
 </body>
 </html>
 
-2. agent.css
+2. manager.css
 
 * {
     box-sizing: border-box;
@@ -576,14 +878,15 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
     --primary-dark: #1d4ed8;
     --primary-soft: #eff6ff;
 
-    --sidebar: #111827;
-    --sidebar-hover: #1f2937;
-
     --background: #f5f7fb;
     --surface: #ffffff;
 
+    --sidebar: #111827;
+    --sidebar-hover: #1f2937;
+
     --text: #111827;
     --muted: #6b7280;
+
     --border: #e5e7eb;
 
     --success: #16a34a;
@@ -592,21 +895,34 @@ Before the Manager is connected, we’ll keep one realistic test record in JavaS
     --warning: #ea580c;
     --warning-soft: #fff7ed;
 
+    --purple: #7c3aed;
+    --purple-soft: #f5f3ff;
+
     --danger: #dc2626;
 
     --radius: 12px;
 }
 
+
+/* ==================================================
+   GLOBAL
+================================================== */
+
 body {
     margin: 0;
-    font-family: "Segoe UI", Arial, sans-serif;
+
+    font-family:
+        "Segoe UI",
+        Arial,
+        sans-serif;
+
     background: var(--background);
     color: var(--text);
 }
 
 button,
 input,
-textarea {
+select {
     font-family: inherit;
 }
 
@@ -614,23 +930,23 @@ button {
     cursor: pointer;
 }
 
-
-/* =========================
-   APP
-========================= */
-
-.app {
-    min-height: 100vh;
+.hidden {
+    display: none !important;
 }
 
 
-/* =========================
+/* ==================================================
    SIDEBAR
-========================= */
+================================================== */
 
 .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
+
+    inset:
+        0
+        auto
+        0
+        0;
 
     width: 250px;
 
@@ -640,18 +956,25 @@ button {
     padding: 24px 16px;
 
     background: var(--sidebar);
+
     color: white;
 
     z-index: 100;
 }
 
+
 .brand {
     display: flex;
     align-items: center;
+
     gap: 12px;
 
-    padding: 0 8px 28px;
+    padding:
+        0
+        8px
+        28px;
 }
+
 
 .brand-logo {
     width: 42px;
@@ -668,19 +991,24 @@ button {
     font-weight: 700;
 }
 
+
 .brand-text strong,
 .brand-text span {
     display: block;
 }
 
+
 .brand-text strong {
     font-size: 14px;
 }
 
+
 .brand-text span {
     margin-top: 3px;
-    font-size: 11px;
+
     color: #9ca3af;
+
+    font-size: 11px;
 }
 
 
@@ -690,6 +1018,7 @@ button {
     flex: 1;
 }
 
+
 .nav-btn {
     position: relative;
 
@@ -697,10 +1026,11 @@ button {
 
     display: flex;
     align-items: center;
+
     gap: 12px;
 
-    padding: 13px 14px;
     margin-bottom: 6px;
+    padding: 13px 14px;
 
     border: 0;
     border-radius: 9px;
@@ -708,27 +1038,33 @@ button {
     background: transparent;
     color: #9ca3af;
 
-    text-align: left;
     font-size: 13px;
+    text-align: left;
 
-    transition: 0.15s;
+    transition: .15s;
 }
+
 
 .nav-btn:hover {
-    color: white;
     background: var(--sidebar-hover);
+    color: white;
 }
 
+
 .nav-btn.active {
-    color: white;
     background: var(--primary);
+    color: white;
 }
+
 
 .nav-icon {
     width: 20px;
-    text-align: center;
+
     font-size: 17px;
+
+    text-align: center;
 }
+
 
 .nav-count {
     margin-left: auto;
@@ -746,66 +1082,78 @@ button {
     background: #ef4444;
     color: white;
 
-    font-size: 11px;
+    font-size: 10px;
 }
 
 
-/* AGENT */
+/* PROFILE */
 
-.agent-profile {
+.manager-profile {
     display: flex;
     align-items: center;
+
     gap: 10px;
 
-    padding: 18px 8px 0;
+    padding:
+        18px
+        8px
+        0;
 
-    border-top: 1px solid #374151;
+    border-top:
+        1px solid
+        #374151;
 }
 
-.avatar,
-.mini-avatar {
-    display: grid;
-    place-items: center;
-
-    border-radius: 50%;
-
-    font-weight: 700;
-}
 
 .avatar {
     width: 39px;
     height: 39px;
 
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+
     background: #374151;
 
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 700;
 }
 
-.agent-profile-text strong,
-.agent-profile-text span {
+
+.manager-profile strong,
+.manager-profile span {
     display: block;
 }
 
-.agent-profile-text strong {
+
+.manager-profile strong {
     font-size: 12px;
 }
 
-.agent-profile-text span {
+
+.manager-profile span {
     margin-top: 3px;
-    font-size: 11px;
+
     color: #9ca3af;
+
+    font-size: 10px;
 }
 
 
-/* =========================
+/* ==================================================
    MAIN
-========================= */
+================================================== */
 
 .main {
     min-height: 100vh;
 
     margin-left: 250px;
-    padding: 30px 38px 50px;
+
+    padding:
+        30px
+        38px
+        80px;
 }
 
 
@@ -819,208 +1167,193 @@ button {
     margin-bottom: 28px;
 }
 
+
 .topbar h1 {
     margin: 0;
+
     font-size: 25px;
 }
 
-.topbar > div > p {
-    margin: 6px 0 0;
+
+.topbar p {
+    margin:
+        6px
+        0
+        0;
 
     color: var(--muted);
-    font-size: 13px;
+
+    font-size: 12px;
 }
 
-.topbar-right {
+
+.topbar-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+
+    gap: 10px;
 }
+
 
 .date-box {
     padding: 10px 14px;
 
-    border: 1px solid var(--border);
-    border-radius: 9px;
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 8px;
 
     background: white;
 
     color: #4b5563;
-    font-size: 12px;
-}
 
-.agent-mini {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-
-    padding: 7px 12px 7px 7px;
-
-    background: white;
-
-    border: 1px solid var(--border);
-    border-radius: 9px;
-}
-
-.mini-avatar {
-    width: 32px;
-    height: 32px;
-
-    background: var(--primary-soft);
-    color: var(--primary);
-
-    font-size: 10px;
-}
-
-.agent-mini strong,
-.agent-mini span {
-    display: block;
-}
-
-.agent-mini strong {
     font-size: 11px;
 }
 
-.agent-mini span {
-    margin-top: 2px;
-    font-size: 10px;
-    color: var(--muted);
-}
 
-
-/* =========================
-   PAGE
-========================= */
+/* ==================================================
+   PAGES
+================================================== */
 
 .page {
     display: none;
 }
+
 
 .page.active {
     display: block;
 }
 
 
-/* =========================
-   DASHBOARD
-========================= */
+/* ==================================================
+   BUTTONS
+================================================== */
 
-.welcome {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.primary-btn,
+.secondary-btn,
+.validate-btn {
+    padding: 10px 15px;
 
-    padding: 25px 27px;
-    margin-bottom: 20px;
+    border-radius: 8px;
 
-    border-radius: var(--radius);
-
-    background:
-        linear-gradient(
-            110deg,
-            #eff6ff,
-            #ffffff
-        );
-
-    border: 1px solid #dbeafe;
+    font-size: 11px;
+    font-weight: 650;
 }
 
-.eyebrow {
-    display: block;
-
-    margin-bottom: 7px;
-
-    color: var(--primary);
-
-    font-size: 10px;
-    font-weight: 700;
-
-    letter-spacing: 1px;
-}
-
-.welcome h2 {
-    margin: 0;
-    font-size: 21px;
-}
-
-.welcome p {
-    margin: 7px 0 0;
-
-    color: var(--muted);
-    font-size: 12px;
-}
-
-
-/* BUTTON */
 
 .primary-btn {
-    padding: 11px 16px;
-
     border: 0;
-    border-radius: 8px;
 
     background: var(--primary);
     color: white;
-
-    font-size: 12px;
-    font-weight: 600;
 }
+
 
 .primary-btn:hover {
     background: var(--primary-dark);
 }
 
 
-/* STATS */
+.secondary-btn {
+    border:
+        1px solid
+        var(--border);
 
-.stats {
+    background: white;
+    color: #4b5563;
+}
+
+
+.text-btn {
+    border: 0;
+
+    background: transparent;
+    color: var(--primary);
+
+    font-size: 11px;
+    font-weight: 600;
+}
+
+
+button:disabled {
+    opacity: .45;
+
+    cursor: not-allowed;
+}
+
+
+/* ==================================================
+   STATS
+================================================== */
+
+.stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
 
-    gap: 18px;
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 17px;
 
     margin-bottom: 20px;
 }
 
+
 .stat-card {
     display: flex;
     align-items: center;
-    gap: 15px;
+
+    gap: 14px;
 
     padding: 20px;
 
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        var(--radius);
 
     background: white;
 }
 
+
 .stat-icon {
-    width: 44px;
-    height: 44px;
+    width: 43px;
+    height: 43px;
 
     display: grid;
     place-items: center;
 
     border-radius: 10px;
 
-    font-size: 19px;
+    font-size: 17px;
 }
 
-.warning-icon {
-    background: var(--warning-soft);
-    color: var(--warning);
-}
 
-.active-icon {
+.blue {
     background: var(--primary-soft);
     color: var(--primary);
 }
 
-.success-icon {
+
+.orange {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+
+.green {
     background: var(--success-soft);
     color: var(--success);
 }
+
+
+.purple {
+    background: var(--purple-soft);
+    color: var(--purple);
+}
+
 
 .stat-card span {
     display: block;
@@ -1028,27 +1361,35 @@ button {
     margin-bottom: 4px;
 
     color: var(--muted);
-    font-size: 11px;
+
+    font-size: 10px;
 }
+
 
 .stat-card strong {
-    font-size: 26px;
+    font-size: 25px;
 }
 
 
-/* =========================
+/* ==================================================
    CARD
-========================= */
+================================================== */
 
 .card {
     margin-bottom: 18px;
+
     padding: 21px;
 
-    background: white;
+    border:
+        1px solid
+        var(--border);
 
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius:
+        var(--radius);
+
+    background: white;
 }
+
 
 .card-header {
     display: flex;
@@ -1058,76 +1399,142 @@ button {
     margin-bottom: 18px;
 }
 
-.card-header h3,
-.section-heading h3 {
+
+.card-header h2 {
     margin: 0;
+
     font-size: 15px;
 }
 
-.card-header p,
-.section-heading p {
-    margin: 5px 0 0;
 
-    color: var(--muted);
-    font-size: 11px;
-}
-
-.text-btn {
-    border: 0;
-    background: transparent;
-
-    color: var(--primary);
-
-    font-size: 11px;
-    font-weight: 600;
-}
-
-
-/* =========================
-   TABLE
-========================= */
-
-.table-wrapper {
-    overflow-x: auto;
-}
-
-table {
-    width: 100%;
-
-    border-collapse: collapse;
-
-    font-size: 12px;
-}
-
-th {
-    padding: 11px 12px;
-
-    background: #f9fafb;
-
-    border-bottom: 1px solid var(--border);
+.card-header p {
+    margin:
+        5px
+        0
+        0;
 
     color: var(--muted);
 
     font-size: 10px;
+}
+
+
+/* ==================================================
+   EMPTY
+================================================== */
+
+.empty-state {
+    padding: 55px 25px;
+
+    text-align: center;
+}
+
+
+.empty-state.small {
+    padding: 35px 20px;
+}
+
+
+.empty-icon {
+    width: 48px;
+    height: 48px;
+
+    display: grid;
+    place-items: center;
+
+    margin:
+        0
+        auto
+        12px;
+
+    border-radius: 50%;
+
+    background: var(--primary-soft);
+    color: var(--primary);
+
+    font-size: 20px;
+}
+
+
+.empty-state h3 {
+    margin:
+        0
+        0
+        6px;
+
+    font-size: 14px;
+}
+
+
+.empty-state p {
+    margin:
+        0
+        0
+        15px;
+
+    color: var(--muted);
+
+    font-size: 10px;
+}
+
+
+/* ==================================================
+   FILE
+================================================== */
+
+.file-summary {
+    display: flex;
+    align-items: center;
+
+    gap: 13px;
+}
+
+
+.file-icon {
+    width: 44px;
+    height: 44px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 9px;
+
+    background: var(--success-soft);
+    color: var(--success);
+
+    font-size: 11px;
     font-weight: 700;
-    text-align: left;
-    text-transform: uppercase;
-
-    letter-spacing: 0.3px;
-}
-
-td {
-    padding: 13px 12px;
-
-    border-bottom: 1px solid #f1f3f5;
-}
-
-tbody tr:last-child td {
-    border-bottom: 0;
 }
 
 
-/* STATUS */
+.file-details {
+    flex: 1;
+}
+
+
+.file-details strong,
+.file-details span {
+    display: block;
+}
+
+
+.file-details strong {
+    margin-bottom: 4px;
+
+    font-size: 12px;
+}
+
+
+.file-details span {
+    color: var(--muted);
+
+    font-size: 10px;
+}
+
+
+/* ==================================================
+   STATUS
+================================================== */
 
 .status {
     display: inline-flex;
@@ -1137,467 +1544,295 @@ tbody tr:last-child td {
 
     border-radius: 20px;
 
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 9px;
+    font-weight: 650;
 }
 
-.pending-status {
-    background: var(--warning-soft);
-    color: var(--warning);
+
+.neutral-status {
+    background: #f3f4f6;
+    color: #6b7280;
 }
 
-.processing-status {
-    background: var(--primary-soft);
-    color: var(--primary);
-}
 
-.completed-status {
+.success-status,
+.assigned-status {
     background: var(--success-soft);
     color: var(--success);
 }
 
 
-/* =========================
-   WORKSPACE
-========================= */
-
-.workspace {
-    display: grid;
-
-    grid-template-columns:
-        minmax(340px, 0.75fr)
-        minmax(500px, 1.25fr);
-
-    gap: 20px;
-
-    align-items: start;
+.unassigned-status {
+    background: var(--warning-soft);
+    color: var(--warning);
 }
 
-.queue-card {
-    position: sticky;
-    top: 20px;
 
-    max-height: calc(100vh - 60px);
+/* ==================================================
+   TABLE
+================================================== */
 
-    overflow: hidden;
-
-    display: flex;
-    flex-direction: column;
+.table-wrapper {
+    overflow-x: auto;
 }
 
-.pill {
-    min-width: 28px;
-    height: 28px;
 
-    display: grid;
-    place-items: center;
-
-    padding: 0 8px;
-
-    border-radius: 20px;
-
-    background: var(--primary-soft);
-    color: var(--primary);
-
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.queue-search {
-    margin-bottom: 13px;
-}
-
-.queue-search input,
-.history-search {
+table {
     width: 100%;
 
-    padding: 10px 12px;
-
-    border: 1px solid var(--border);
-    border-radius: 8px;
-
-    outline: none;
-
-    background: #fafafa;
+    border-collapse: collapse;
 
     font-size: 11px;
 }
 
-.queue-search input:focus,
-.history-search:focus {
-    border-color: var(--primary);
-    background: white;
-}
 
-.pending-list {
-    overflow-y: auto;
+th {
+    padding: 11px 12px;
 
-    display: flex;
-    flex-direction: column;
+    border-bottom:
+        1px solid
+        var(--border);
 
-    gap: 8px;
-
-    padding-right: 3px;
-}
-
-
-/* PENDING ITEM */
-
-.pending-item {
-    padding: 14px;
-
-    border: 1px solid var(--border);
-    border-radius: 9px;
-
-    cursor: pointer;
-
-    transition: 0.15s;
-}
-
-.pending-item:hover {
-    border-color: #93c5fd;
-    background: #fafcff;
-}
-
-.pending-item.selected {
-    border-color: var(--primary);
-    background: var(--primary-soft);
-}
-
-.pending-item-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-
-    gap: 10px;
-}
-
-.pending-company {
-    font-size: 12px;
-    font-weight: 650;
-}
-
-.pending-siret {
-    margin-top: 6px;
-
-    color: var(--muted);
-    font-size: 10px;
-}
-
-.pending-meta {
-    display: flex;
-    justify-content: space-between;
-
-    margin-top: 10px;
-    padding-top: 9px;
-
-    border-top: 1px solid #f1f3f5;
-
-    color: var(--muted);
-    font-size: 10px;
-}
-
-
-/* =========================
-   EMPTY
-========================= */
-
-.empty-state {
-    padding: 70px 30px;
-
-    text-align: center;
-}
-
-.empty-state-icon {
-    width: 50px;
-    height: 50px;
-
-    display: grid;
-    place-items: center;
-
-    margin: 0 auto 15px;
-
-    border-radius: 50%;
-
-    background: #f3f4f6;
-    color: #9ca3af;
-
-    font-size: 21px;
-}
-
-.empty-state h3 {
-    margin: 0 0 7px;
-
-    font-size: 15px;
-}
-
-.empty-state p {
-    max-width: 310px;
-
-    margin: auto;
-
-    color: var(--muted);
-    font-size: 11px;
-
-    line-height: 1.6;
-}
-
-.hidden {
-    display: none !important;
-}
-
-
-/* =========================
-   SELECTED CLIENT
-========================= */
-
-.selected-client {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    margin-bottom: 15px;
-    padding: 4px 3px;
-}
-
-.selected-client h2 {
-    margin: 0;
-
-    font-size: 20px;
-}
-
-.selected-siret {
-    display: block;
-
-    margin-top: 5px;
-
-    color: var(--muted);
-    font-size: 11px;
-}
-
-
-/* =========================
-   INFORMATION
-========================= */
-
-.section-heading {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-
-    margin-bottom: 18px;
-}
-
-.heading-icon {
-    width: 37px;
-    height: 37px;
-
-    display: grid;
-    place-items: center;
-
-    border-radius: 8px;
-
-    background: var(--primary-soft);
-    color: var(--primary);
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-
-    gap: 12px;
-}
-
-.info-item {
-    position: relative;
-
-    min-width: 0;
-
-    padding: 11px 42px 11px 12px;
-
-    border: 1px solid var(--border);
-    border-radius: 8px;
-
-    background: #fafafa;
-}
-
-.info-label {
-    display: block;
-
-    margin-bottom: 5px;
+    background: #f9fafb;
 
     color: var(--muted);
 
     font-size: 9px;
     font-weight: 700;
 
+    text-align: left;
     text-transform: uppercase;
 
-    letter-spacing: 0.3px;
+    letter-spacing: .3px;
 }
 
-.info-value {
+
+td {
+    padding: 12px;
+
+    border-bottom:
+        1px solid
+        #f1f3f5;
+}
+
+
+tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+
+/* ==================================================
+   IMPORT
+================================================== */
+
+.upload-zone {
+    padding: 65px 30px;
+
+    border:
+        2px dashed
+        #cbd5e1;
+
+    border-radius:
+        var(--radius);
+
+    background: white;
+
+    text-align: center;
+
+    transition: .2s;
+}
+
+
+.upload-zone.dragging {
+    border-color: var(--primary);
+
+    background: var(--primary-soft);
+}
+
+
+.upload-icon {
+    width: 60px;
+    height: 60px;
+
+    display: grid;
+    place-items: center;
+
+    margin:
+        0
+        auto
+        16px;
+
+    border-radius: 50%;
+
+    background: var(--primary-soft);
+    color: var(--primary);
+
+    font-size: 25px;
+}
+
+
+.upload-zone h2 {
+    margin:
+        0
+        0
+        8px;
+
+    font-size: 18px;
+}
+
+
+.upload-zone p {
+    margin:
+        0
+        auto
+        18px;
+
+    max-width: 450px;
+
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+
+.upload-zone > span {
     display: block;
 
+    margin-top: 13px;
+
+    color: #9ca3af;
+
+    font-size: 9px;
+}
+
+
+.import-success {
+    display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-bottom: 18px;
+
+    padding: 15px 18px;
+
+    border:
+        1px solid
+        #bbf7d0;
+
+    border-radius: 10px;
+
+    background: var(--success-soft);
+}
+
+
+.success-circle {
+    width: 34px;
+    height: 34px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+
+    background: var(--success);
+    color: white;
+
+    font-size: 13px;
+}
+
+
+.import-success > div:nth-child(2) {
+    flex: 1;
+}
+
+
+.import-success strong,
+.import-success span {
+    display: block;
+}
+
+
+.import-success strong {
+    font-size: 11px;
+}
+
+
+.import-success > div:nth-child(2) span {
+    margin-top: 3px;
+
+    color: #4b5563;
+
+    font-size: 9px;
+}
+
+
+/* SOURCE */
+
+.source-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 12px;
+}
+
+
+.source-item {
+    padding: 12px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 8px;
+
+    background: #fafafa;
+}
+
+
+.source-item span,
+.source-item strong {
+    display: block;
+}
+
+
+.source-item span {
+    margin-bottom: 5px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+
+    text-transform: uppercase;
+}
+
+
+.source-item strong {
     overflow: hidden;
 
     font-size: 11px;
-    font-weight: 500;
 
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.copy-button {
-    position: absolute;
 
-    top: 50%;
-    right: 8px;
+.count-pill {
+    padding: 6px 10px;
 
-    transform: translateY(-50%);
+    border-radius: 20px;
 
-    width: 27px;
-    height: 27px;
-
-    border: 0;
-    border-radius: 6px;
-
-    background: white;
-    color: var(--muted);
-
-    font-size: 12px;
-}
-
-.copy-button:hover {
     background: var(--primary-soft);
     color: var(--primary);
+
+    font-size: 9px;
+    font-weight: 700;
 }
 
 
-/* TAKE */
-
-.take-button {
-    width: 100%;
-
-    margin-bottom: 18px;
-    padding: 13px;
-
-    border: 0;
-    border-radius: 9px;
-
-    background: var(--primary);
-    color: white;
-
-    font-size: 12px;
-    font-weight: 650;
-}
-
-.take-button:hover {
-    background: var(--primary-dark);
-}
-
-
-/* =========================
-   TREATMENT
-========================= */
-
-.treatment-card {
-    border-color: #bfdbfe;
-}
-
-.treatment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    margin-bottom: 22px;
-}
-
-.treatment-header > div:first-child {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-}
-
-.processing-dot {
-    width: 9px;
-    height: 9px;
-
-    border-radius: 50%;
-
-    background: var(--primary);
-
-    box-shadow:
-        0 0 0 5px var(--primary-soft);
-}
-
-.treatment-header h3 {
-    margin: 0;
-    font-size: 15px;
-}
-
-.treatment-header p {
-    margin: 4px 0 0;
-
-    color: var(--muted);
-    font-size: 10px;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-
-    gap: 15px;
-}
-
-.form-field label {
-    display: block;
-
-    margin-bottom: 6px;
-
-    font-size: 10px;
-    font-weight: 650;
-}
-
-.optional {
-    color: var(--muted);
-    font-weight: normal;
-}
-
-.form-field input,
-.form-field textarea {
-    width: 100%;
-
-    padding: 11px;
-
-    border: 1px solid var(--border);
-    border-radius: 8px;
-
-    outline: none;
-
-    font-size: 11px;
-
-    transition: 0.15s;
-}
-
-.form-field textarea {
-    min-height: 85px;
-    resize: vertical;
-}
-
-.form-field input:focus,
-.form-field textarea:focus {
-    border-color: var(--primary);
-
-    box-shadow:
-        0 0 0 3px rgba(37, 99, 235, 0.08);
-}
-
-.full-width {
-    grid-column: 1 / -1;
-}
-
-.form-actions {
+.import-actions {
     display: flex;
     justify-content: flex-end;
 
@@ -1606,27 +1841,180 @@ tbody tr:last-child td {
     margin-top: 20px;
     padding-top: 17px;
 
-    border-top: 1px solid var(--border);
+    border-top:
+        1px solid
+        var(--border);
 }
 
-.secondary-btn,
-.complete-btn {
-    padding: 10px 16px;
 
-    border-radius: 8px;
+/* ==================================================
+   ASSIGNMENTS
+================================================== */
 
-    font-size: 11px;
-    font-weight: 650;
+.assignment-summary {
+    display: flex;
+
+    gap: 12px;
+
+    margin-bottom: 17px;
 }
 
-.secondary-btn {
-    border: 1px solid var(--border);
+
+.assignment-summary > div {
+    min-width: 140px;
+
+    padding: 14px 17px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 9px;
 
     background: white;
-    color: #4b5563;
 }
 
-.complete-btn {
+
+.assignment-summary span,
+.assignment-summary strong {
+    display: block;
+}
+
+
+.assignment-summary span {
+    margin-bottom: 4px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+}
+
+
+.assignment-summary strong {
+    font-size: 20px;
+}
+
+
+.assignment-toolbar {
+    display: flex;
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+
+.toolbar-left,
+.bulk-assignment {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+}
+
+
+.search-input {
+    width: 270px;
+}
+
+
+.search-input,
+.filter-select,
+.agent-select {
+    padding: 9px 10px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 7px;
+
+    outline: none;
+
+    background: white;
+
+    font-size: 10px;
+}
+
+
+.search-input:focus,
+.filter-select:focus,
+.agent-select:focus {
+    border-color: var(--primary);
+}
+
+
+.bulk-assignment > span {
+    margin-right: 5px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+}
+
+
+.checkbox-column {
+    width: 40px;
+}
+
+
+.assignment-table tr.selected-row {
+    background: #f8fbff;
+}
+
+
+.agent-select {
+    min-width: 135px;
+}
+
+
+.bottom-actions {
+    position: sticky;
+
+    bottom: 15px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding: 15px 18px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 10px;
+
+    background: rgba(255, 255, 255, .96);
+
+    box-shadow:
+        0 7px 30px
+        rgba(15, 23, 42, .08);
+}
+
+
+.bottom-actions strong,
+.bottom-actions span {
+    display: block;
+}
+
+
+.bottom-actions strong {
+    margin-bottom: 3px;
+
+    font-size: 10px;
+}
+
+
+.bottom-actions span {
+    color: var(--muted);
+
+    font-size: 9px;
+}
+
+
+.validate-btn {
     border: 0;
 
     background: var(--success);
@@ -1634,18 +2022,139 @@ tbody tr:last-child td {
 }
 
 
-/* =========================
-   HISTORY
-========================= */
+/* ==================================================
+   AGENTS
+================================================== */
 
-.history-search {
-    width: 230px;
+.agents-layout {
+    display: grid;
+
+    grid-template-columns:
+        380px
+        1fr;
+
+    gap: 18px;
+
+    align-items: start;
 }
 
 
-/* =========================
+.agent-form label {
+    display: block;
+
+    margin-bottom: 7px;
+
+    font-size: 10px;
+    font-weight: 650;
+}
+
+
+.agent-form > div {
+    display: flex;
+
+    gap: 8px;
+}
+
+
+.agent-form input {
+    flex: 1;
+
+    padding: 10px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 7px;
+
+    outline: none;
+
+    font-size: 10px;
+}
+
+
+.agents-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+.agent-item {
+    display: flex;
+    align-items: center;
+
+    gap: 11px;
+
+    padding: 12px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 8px;
+}
+
+
+.agent-item-avatar {
+    width: 35px;
+    height: 35px;
+
+    display: grid;
+    place-items: center;
+
+    border-radius: 50%;
+
+    background: var(--primary-soft);
+    color: var(--primary);
+
+    font-size: 9px;
+    font-weight: 700;
+}
+
+
+.agent-item-info {
+    flex: 1;
+}
+
+
+.agent-item-info strong,
+.agent-item-info span {
+    display: block;
+}
+
+
+.agent-item-info strong {
+    font-size: 11px;
+}
+
+
+.agent-item-info span {
+    margin-top: 3px;
+
+    color: var(--muted);
+
+    font-size: 9px;
+}
+
+
+.delete-agent {
+    padding: 7px 9px;
+
+    border: 0;
+    border-radius: 6px;
+
+    background: #fef2f2;
+    color: var(--danger);
+
+    font-size: 9px;
+}
+
+
+/* ==================================================
    TOAST
-========================= */
+================================================== */
 
 .toast {
     position: fixed;
@@ -1662,39 +2171,50 @@ tbody tr:last-child td {
     background: #111827;
     color: white;
 
-    font-size: 11px;
+    font-size: 10px;
 
     opacity: 0;
 
-    transform: translateY(10px);
+    transform:
+        translateY(10px);
 
     pointer-events: none;
 
-    transition: 0.2s;
+    transition: .2s;
 }
+
 
 .toast.show {
     opacity: 1;
-    transform: translateY(0);
+
+    transform:
+        translateY(0);
 }
 
 
-/* =========================
+/* ==================================================
    RESPONSIVE
-========================= */
+================================================== */
 
-@media (max-width: 1050px) {
+@media (max-width: 1100px) {
 
-    .workspace {
+    .stats-grid {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+
+    .assignment-toolbar {
+        flex-direction: column;
+    }
+
+
+    .agents-layout {
         grid-template-columns: 1fr;
     }
 
-    .queue-card {
-        position: static;
-        max-height: none;
-    }
-
 }
+
 
 @media (max-width: 800px) {
 
@@ -1702,162 +2222,120 @@ tbody tr:last-child td {
         width: 72px;
     }
 
+
     .brand-text,
     .nav-btn > span:not(.nav-icon):not(.nav-count),
-    .agent-profile-text {
+    .manager-profile > div:not(.avatar) {
         display: none;
     }
 
+
     .brand {
         justify-content: center;
+
         padding-left: 0;
         padding-right: 0;
     }
+
 
     .nav-btn {
         justify-content: center;
     }
 
-    .nav-count {
-        position: absolute;
-
-        top: 3px;
-        right: 3px;
-
-        min-width: 18px;
-        height: 18px;
-
-        font-size: 8px;
-    }
-
-    .agent-profile {
-        justify-content: center;
-    }
 
     .main {
         margin-left: 72px;
-        padding: 22px;
+
+        padding: 20px;
     }
 
-    .stats {
+
+    .source-grid {
         grid-template-columns: 1fr;
     }
 
-    .info-grid,
-    .form-grid {
+
+    .stats-grid {
         grid-template-columns: 1fr;
     }
 
-    .full-width {
-        grid-column: auto;
-    }
 
-    .agent-mini,
     .date-box {
         display: none;
     }
 
-}
 
-3. agent.js
-
-For this version I've deliberately separated the test data from the interface logic. When we connect the Manager later, this is the part we'll replace.
-
-/* ==========================================================
-   CONFIGURATION AGENT
-   Later this will be determined automatically.
-========================================================== */
-
-const AGENT = {
-    id: "HAMDANMO",
-    name: "HAMDANMO"
-};
-
-
-/* ==========================================================
-   TEST DATA
-
-   This simulates what the Manager will eventually assign
-   automatically to this agent.
-
-   The agent DOES NOT import this.
-========================================================== */
-
-const TEST_ASSIGNMENTS = [
-
-    {
-        id: "LIGNE-001",
-
-        assignedTo: "HAMDANMO",
-
-        assignedAt: "16/09/2026 15:30",
-
-        source: {
-            nomCSP: "CYBERG",
-
-            contratBAD:
-                "SDE0292842741001C7",
-
-            idtConnexion:
-                "217949401658",
-
-            mdpCSP:
-                "Cyberg2026!",
-
-            numeroAbonneCSP:
-                "070023415046342",
-
-            iban:
-                "FR7610096185200004209200127"
-        },
-
-        line: {
-            siret:
-                "79965994100014",
-
-            raisonSociale:
-                "SCI C14",
-
-            typeFacture:
-                "E+R",
-
-            dateLimite:
-                "03/09/2026"
-        },
-
-        status: "pending"
+    .toolbar-left,
+    .bulk-assignment {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-];
 
+    .search-input {
+        width: 100%;
+    }
+
+}
+
+3. manager.js
+
+This is the important part.
+
+Because Excel files aren't guaranteed to always have exactly the same row numbers, I don't want to hard-code only A3, B3, etc. The importer searches the sheet for recognizable labels such as Contrat BAD, IDT de connexion, SIRET, RAISON SOCIALE, etc.
 
 /* ==========================================================
    STORAGE
 ========================================================== */
 
 const STORAGE_KEY =
-    `gestion_traitement_${AGENT.id}`;
+    "gestion_traitement_manager";
 
 
-let state = loadState();
+const DEFAULT_AGENTS = [
+    {
+        id: "HAMDANMO",
+        name: "HAMDANMO"
+    },
+    {
+        id: "YASSINE",
+        name: "YASSINE"
+    },
+    {
+        id: "SARA",
+        name: "SARA"
+    }
+];
+
+
+let state =
+    loadState();
 
 
 function loadState() {
 
     const saved =
-        localStorage.getItem(STORAGE_KEY);
+        localStorage.getItem(
+            STORAGE_KEY
+        );
 
 
     if (saved) {
 
         try {
-            return JSON.parse(saved);
+
+            return JSON.parse(
+                saved
+            );
+
         }
         catch (error) {
+
             console.error(
-                "Impossible de lire les données enregistrées.",
+                "Erreur lecture données Manager",
                 error
             );
+
         }
 
     }
@@ -1865,14 +2343,16 @@ function loadState() {
 
     return {
 
-        assignments:
-            JSON.parse(
-                JSON.stringify(TEST_ASSIGNMENTS)
-            ),
+        agents:
+            [...DEFAULT_AGENTS],
 
-        completed: [],
+        file: null,
 
-        activeTreatmentId: null
+        source: {},
+
+        lines: [],
+
+        validated: false
 
     };
 
@@ -1885,107 +2365,6 @@ function saveState() {
         STORAGE_KEY,
         JSON.stringify(state)
     );
-
-}
-
-
-/* ==========================================================
-   SELECTION
-========================================================== */
-
-let selectedLineId = null;
-
-
-/* ==========================================================
-   ELEMENTS
-========================================================== */
-
-const pendingList =
-    document.getElementById("pendingList");
-
-const dashboardTable =
-    document.getElementById("dashboardTable");
-
-const historyTable =
-    document.getElementById("historyTable");
-
-const emptySelection =
-    document.getElementById("emptySelection");
-
-const selectedDetails =
-    document.getElementById("selectedDetails");
-
-const treatmentForm =
-    document.getElementById("treatmentForm");
-
-const takeButton =
-    document.getElementById("takeButton");
-
-const pendingSearch =
-    document.getElementById("pendingSearch");
-
-const historySearch =
-    document.getElementById("historySearch");
-
-
-/* ==========================================================
-   AGENT
-========================================================== */
-
-function initializeAgent() {
-
-    const initials =
-        getInitials(AGENT.name);
-
-
-    document.getElementById(
-        "agentName"
-    ).textContent = AGENT.name;
-
-
-    document.getElementById(
-        "topAgentName"
-    ).textContent = AGENT.name;
-
-
-    document.getElementById(
-        "welcomeAgent"
-    ).textContent = AGENT.name;
-
-
-    document.getElementById(
-        "agentInitials"
-    ).textContent = initials;
-
-
-    document.getElementById(
-        "topInitials"
-    ).textContent = initials;
-
-}
-
-
-function getInitials(name) {
-
-    const words =
-        name
-            .trim()
-            .split(/\s+/);
-
-
-    if (words.length === 1) {
-
-        return words[0]
-            .substring(0, 2)
-            .toUpperCase();
-
-    }
-
-
-    return (
-        words[0][0] +
-        words[words.length - 1][0]
-    ).toUpperCase();
 
 }
 
@@ -2012,13 +2391,52 @@ document
     });
 
 
+const PAGE_INFO = {
+
+    dashboard: {
+        title:
+            "Tableau de bord",
+
+        subtitle:
+            "Vue générale des affectations."
+    },
+
+    import: {
+        title:
+            "Import Excel",
+
+        subtitle:
+            "Importez et contrôlez le fichier source."
+    },
+
+    assignments: {
+        title:
+            "Affectations",
+
+        subtitle:
+            "Affectez les lignes aux agents."
+    },
+
+    agents: {
+        title:
+            "Agents",
+
+        subtitle:
+            "Gérez les agents disponibles."
+    }
+
+};
+
+
 function showPage(pageName) {
 
     document
         .querySelectorAll(".page")
         .forEach(page => {
 
-            page.classList.remove("active");
+            page.classList.remove(
+                "active"
+            );
 
         });
 
@@ -2027,7 +2445,9 @@ function showPage(pageName) {
         .querySelectorAll(".nav-btn")
         .forEach(button => {
 
-            button.classList.remove("active");
+            button.classList.remove(
+                "active"
+            );
 
         });
 
@@ -2044,122 +2464,1284 @@ function showPage(pageName) {
         .classList.add("active");
 
 
-    const titles = {
-
-        dashboard: {
-            title:
-                "Tableau de bord",
-
-            subtitle:
-                "Suivez et traitez vos lignes affectées."
-        },
-
-        pending: {
-            title:
-                "À traiter",
-
-            subtitle:
-                "Consultez les lignes qui vous ont été affectées."
-        },
-
-        history: {
-            title:
-                "Historique",
-
-            subtitle:
-                "Consultez vos traitements terminés."
-        }
-
-    };
-
-
     document.getElementById(
         "pageTitle"
     ).textContent =
-        titles[pageName].title;
+        PAGE_INFO[pageName].title;
 
 
     document.getElementById(
         "pageSubtitle"
     ).textContent =
-        titles[pageName].subtitle;
+        PAGE_INFO[pageName].subtitle;
 
 
-    if (pageName === "history") {
-        renderHistory();
+    if (pageName === "assignments") {
+
+        renderAssignments();
+
+    }
+
+
+    if (pageName === "agents") {
+
+        renderAgents();
+
     }
 
 }
 
 
-function openPendingPage() {
-    showPage("pending");
+/* ==========================================================
+   EXCEL INPUT
+========================================================== */
+
+const excelInput =
+    document.getElementById(
+        "excelInput"
+    );
+
+
+const dropZone =
+    document.getElementById(
+        "dropZone"
+    );
+
+
+function openImportDialog() {
+
+    showPage("import");
+
+    excelInput.click();
+
 }
 
 
+excelInput.addEventListener(
+    "change",
+    event => {
+
+        const file =
+            event.target.files[0];
+
+
+        if (file) {
+
+            importExcelFile(file);
+
+        }
+
+    }
+);
+
+
 /* ==========================================================
-   PENDING DATA
+   DRAG & DROP
 ========================================================== */
 
-function getPendingAssignments() {
+[
+    "dragenter",
+    "dragover"
+]
+.forEach(eventName => {
 
-    return state.assignments.filter(
-        item =>
-            item.status === "pending" ||
-            item.status === "processing"
+    dropZone.addEventListener(
+        eventName,
+        event => {
+
+            event.preventDefault();
+
+            dropZone.classList.add(
+                "dragging"
+            );
+
+        }
+    );
+
+});
+
+
+[
+    "dragleave",
+    "drop"
+]
+.forEach(eventName => {
+
+    dropZone.addEventListener(
+        eventName,
+        event => {
+
+            event.preventDefault();
+
+            dropZone.classList.remove(
+                "dragging"
+            );
+
+        }
+    );
+
+});
+
+
+dropZone.addEventListener(
+    "drop",
+    event => {
+
+        const file =
+            event.dataTransfer.files[0];
+
+
+        if (!file) {
+            return;
+        }
+
+
+        importExcelFile(file);
+
+    }
+);
+
+
+/* ==========================================================
+   IMPORT EXCEL
+========================================================== */
+
+function importExcelFile(file) {
+
+    if (
+        typeof XLSX === "undefined"
+    ) {
+
+        showToast(
+            "La bibliothèque XLSX n'est pas chargée."
+        );
+
+        return;
+
+    }
+
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload =
+        event => {
+
+            try {
+
+                const data =
+                    new Uint8Array(
+                        event.target.result
+                    );
+
+
+                const workbook =
+                    XLSX.read(
+                        data,
+                        {
+                            type: "array",
+                            cellDates: true
+                        }
+                    );
+
+
+                /*
+                    For V1 we use the first worksheet.
+                */
+
+                const firstSheetName =
+                    workbook.SheetNames[0];
+
+
+                const worksheet =
+                    workbook.Sheets[
+                        firstSheetName
+                    ];
+
+
+                /*
+                    header: 1 gives us
+                    a raw 2D array.
+                */
+
+                const matrix =
+                    XLSX.utils.sheet_to_json(
+                        worksheet,
+                        {
+                            header: 1,
+                            defval: "",
+                            raw: false
+                        }
+                    );
+
+
+                processExcelData(
+                    matrix,
+                    file
+                );
+
+            }
+            catch (error) {
+
+                console.error(error);
+
+                showToast(
+                    "Impossible de lire ce fichier Excel."
+                );
+
+            }
+
+        };
+
+
+    reader.readAsArrayBuffer(
+        file
     );
 
 }
 
 
 /* ==========================================================
-   COUNTERS
+   PROCESS EXCEL
 ========================================================== */
 
-function updateCounters() {
+function processExcelData(
+    matrix,
+    file
+) {
 
-    const pending =
-        state.assignments.filter(
-            item =>
-                item.status === "pending"
-        ).length;
-
-
-    const processing =
-        state.assignments.filter(
-            item =>
-                item.status === "processing"
-        ).length;
+    const source =
+        extractSourceInformation(
+            matrix
+        );
 
 
-    const completed =
-        state.completed.length;
+    const table =
+        extractClientTable(
+            matrix
+        );
+
+
+    if (
+        table.lines.length === 0
+    ) {
+
+        showToast(
+            "Aucune ligne client détectée."
+        );
+
+        return;
+
+    }
+
+
+    state.file = {
+
+        name:
+            file.name,
+
+        size:
+            file.size,
+
+        importedAt:
+            new Date()
+                .toLocaleString(
+                    "fr-FR"
+                )
+
+    };
+
+
+    state.source =
+        source;
+
+
+    state.lines =
+        table.lines;
+
+
+    state.validated =
+        false;
+
+
+    saveState();
+
+
+    renderAll();
+
+
+    showImportResult();
+
+
+    showToast(
+        `${table.lines.length} ligne(s) détectée(s).`
+    );
+
+}
+
+
+/* ==========================================================
+   NORMALIZE TEXT
+========================================================== */
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .normalize("NFD")
+        .replace(
+            /[\u0300-\u036f]/g,
+            ""
+        )
+        .trim()
+        .toLowerCase();
+
+}
+
+
+/* ==========================================================
+   SOURCE INFORMATION
+========================================================== */
+
+function extractSourceInformation(
+    matrix
+) {
+
+    const source = {
+
+        nomCSP:
+            findValueNearLabel(
+                matrix,
+                [
+                    "coordonnees du csp",
+                    "nom csp"
+                ]
+            ),
+
+        contratBAD:
+            findValueNearLabel(
+                matrix,
+                [
+                    "contrat bad"
+                ]
+            ),
+
+        idtConnexion:
+            findValueNearLabel(
+                matrix,
+                [
+                    "idt de connexion",
+                    "idt connexion"
+                ]
+            ),
+
+        mdpCSP:
+            findValueNearLabel(
+                matrix,
+                [
+                    "mdp csp"
+                ]
+            ),
+
+        numeroAbonneCSP:
+            findValueNearLabel(
+                matrix,
+                [
+                    "n° abonne csp",
+                    "n abonne csp",
+                    "numero abonne csp"
+                ]
+            ),
+
+        iban:
+            findValueNearLabel(
+                matrix,
+                [
+                    "iban de prelevement",
+                    "iban prelevement"
+                ]
+            )
+
+    };
+
+
+    /*
+        In the screenshot "CYBERG" appears
+        above "Coordonnées du CSP".
+
+        If nomCSP wasn't found by a label,
+        try to retrieve a meaningful cell above
+        the source-information area.
+    */
+
+    if (!source.nomCSP) {
+
+        source.nomCSP =
+            findCSPName(matrix);
+
+    }
+
+
+    return source;
+
+}
+
+
+/* ==========================================================
+   FIND VALUE NEXT TO LABEL
+========================================================== */
+
+function findValueNearLabel(
+    matrix,
+    labels
+) {
+
+    const normalizedLabels =
+        labels.map(
+            normalizeText
+        );
+
+
+    for (
+        let rowIndex = 0;
+        rowIndex < matrix.length;
+        rowIndex++
+    ) {
+
+        const row =
+            matrix[rowIndex];
+
+
+        for (
+            let colIndex = 0;
+            colIndex < row.length;
+            colIndex++
+        ) {
+
+            const current =
+                normalizeText(
+                    row[colIndex]
+                );
+
+
+            const matched =
+                normalizedLabels.some(
+                    label =>
+                        current === label ||
+                        current.includes(label)
+                );
+
+
+            if (!matched) {
+                continue;
+            }
+
+
+            /*
+                Search right first.
+            */
+
+            for (
+                let c =
+                    colIndex + 1;
+
+                c <
+                    Math.min(
+                        row.length,
+                        colIndex + 5
+                    );
+
+                c++
+            ) {
+
+                const value =
+                    String(
+                        row[c] ?? ""
+                    ).trim();
+
+
+                if (value) {
+                    return value;
+                }
+
+            }
+
+
+            /*
+                Then try directly below.
+            */
+
+            for (
+                let r =
+                    rowIndex + 1;
+
+                r <
+                    Math.min(
+                        matrix.length,
+                        rowIndex + 3
+                    );
+
+                r++
+            ) {
+
+                const value =
+                    String(
+                        matrix[r]?.[
+                            colIndex
+                        ] ?? ""
+                    ).trim();
+
+
+                if (value) {
+                    return value;
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return "";
+
+}
+
+
+/* ==========================================================
+   CSP NAME
+========================================================== */
+
+function findCSPName(matrix) {
+
+    for (
+        let rowIndex = 0;
+        rowIndex < matrix.length;
+        rowIndex++
+    ) {
+
+        const row =
+            matrix[rowIndex];
+
+
+        const hasCoordinateLabel =
+            row.some(
+                value =>
+                    normalizeText(value)
+                        .includes(
+                            "coordonnees du csp"
+                        )
+            );
+
+
+        if (!hasCoordinateLabel) {
+            continue;
+        }
+
+
+        /*
+            Look a few rows above.
+        */
+
+        for (
+            let r =
+                rowIndex - 1;
+
+            r >=
+                Math.max(
+                    0,
+                    rowIndex - 3
+                );
+
+            r--
+        ) {
+
+            for (
+                const value
+                of matrix[r]
+            ) {
+
+                const text =
+                    String(
+                        value ?? ""
+                    ).trim();
+
+
+                if (
+                    text &&
+                    text.length < 50
+                ) {
+
+                    return text;
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return "";
+
+}
+
+
+/* ==========================================================
+   DETECT CLIENT TABLE
+========================================================== */
+
+function extractClientTable(
+    matrix
+) {
+
+    let headerRowIndex =
+        -1;
+
+
+    let columns = {
+
+        siret: -1,
+
+        raisonSociale: -1,
+
+        typeFacture: -1,
+
+        dateLimite: -1,
+
+        numeroAbonne: -1,
+
+        identifiant: -1,
+
+        mdp: -1,
+
+        contratBAD: -1,
+
+        rattachement: -1,
+
+        commentaire: -1
+
+    };
+
+
+    /*
+        Find row containing SIRET
+        and Raison Sociale.
+    */
+
+    for (
+        let r = 0;
+        r < matrix.length;
+        r++
+    ) {
+
+        const normalizedRow =
+            matrix[r].map(
+                normalizeText
+            );
+
+
+        const siretIndex =
+            normalizedRow.findIndex(
+                value =>
+                    value.includes(
+                        "siret"
+                    )
+            );
+
+
+        const raisonIndex =
+            normalizedRow.findIndex(
+                value =>
+                    value.includes(
+                        "raison sociale"
+                    )
+            );
+
+
+        if (
+            siretIndex !== -1 &&
+            raisonIndex !== -1
+        ) {
+
+            headerRowIndex = r;
+
+            columns.siret =
+                siretIndex;
+
+            columns.raisonSociale =
+                raisonIndex;
+
+
+            columns.typeFacture =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "type facture",
+                        "factures en emission",
+                        "emission"
+                    ]
+                );
+
+
+            columns.dateLimite =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "date limite"
+                    ]
+                );
+
+
+            columns.numeroAbonne =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "n°abonne e-factures",
+                        "n abonne e-factures",
+                        "abonne e-factures"
+                    ]
+                );
+
+
+            columns.identifiant =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "identifiant"
+                    ]
+                );
+
+
+            columns.mdp =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "mdp"
+                    ]
+                );
+
+
+            columns.contratBAD =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "contrat b@d",
+                        "contrat bad"
+                    ]
+                );
+
+
+            columns.rattachement =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "rattachement"
+                    ]
+                );
+
+
+            columns.commentaire =
+                findColumn(
+                    normalizedRow,
+                    [
+                        "commentaire"
+                    ]
+                );
+
+
+            break;
+
+        }
+
+    }
+
+
+    if (
+        headerRowIndex === -1
+    ) {
+
+        return {
+            headerRowIndex,
+            columns,
+            lines: []
+        };
+
+    }
+
+
+    const lines = [];
+
+
+    for (
+        let r =
+            headerRowIndex + 1;
+
+        r < matrix.length;
+
+        r++
+    ) {
+
+        const row =
+            matrix[r];
+
+
+        const siret =
+            cellValue(
+                row,
+                columns.siret
+            );
+
+
+        const raison =
+            cellValue(
+                row,
+                columns.raisonSociale
+            );
+
+
+        /*
+            Empty row = stop after table area.
+        */
+
+        if (
+            !siret &&
+            !raison
+        ) {
+
+            continue;
+
+        }
+
+
+        /*
+            Ignore garbage/non-client rows.
+        */
+
+        if (
+            !siret ||
+            !raison
+        ) {
+
+            continue;
+
+        }
+
+
+        lines.push({
+
+            id:
+                createLineId(
+                    siret,
+                    r
+                ),
+
+            excelRow:
+                r + 1,
+
+            line: {
+
+                siret:
+                    siret,
+
+                raisonSociale:
+                    raison,
+
+                typeFacture:
+                    cellValue(
+                        row,
+                        columns.typeFacture
+                    ),
+
+                dateLimite:
+                    cellValue(
+                        row,
+                        columns.dateLimite
+                    ),
+
+                numeroAbonne:
+                    cellValue(
+                        row,
+                        columns.numeroAbonne
+                    ),
+
+                identifiant:
+                    cellValue(
+                        row,
+                        columns.identifiant
+                    ),
+
+                mdp:
+                    cellValue(
+                        row,
+                        columns.mdp
+                    ),
+
+                contratBAD:
+                    cellValue(
+                        row,
+                        columns.contratBAD
+                    ),
+
+                rattachement:
+                    cellValue(
+                        row,
+                        columns.rattachement
+                    ),
+
+                commentaire:
+                    cellValue(
+                        row,
+                        columns.commentaire
+                    )
+
+            },
+
+            assignedTo:
+                null,
+
+            status:
+                "unassigned"
+
+        });
+
+    }
+
+
+    return {
+        headerRowIndex,
+        columns,
+        lines
+    };
+
+}
+
+
+/* ==========================================================
+   FIND COLUMN
+========================================================== */
+
+function findColumn(
+    normalizedRow,
+    candidates
+) {
+
+    const normalizedCandidates =
+        candidates.map(
+            normalizeText
+        );
+
+
+    return normalizedRow.findIndex(
+        cell => {
+
+            return normalizedCandidates.some(
+                candidate =>
+                    cell === candidate ||
+                    cell.includes(candidate)
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   CELL
+========================================================== */
+
+function cellValue(
+    row,
+    index
+) {
+
+    if (
+        index === -1 ||
+        index == null
+    ) {
+
+        return "";
+
+    }
+
+
+    return String(
+        row[index] ?? ""
+    ).trim();
+
+}
+
+
+/* ==========================================================
+   ID
+========================================================== */
+
+function createLineId(
+    siret,
+    rowIndex
+) {
+
+    return (
+        "LINE-" +
+        String(siret)
+            .replace(
+                /\s/g,
+                ""
+            ) +
+        "-" +
+        rowIndex
+    );
+
+}
+
+
+/* ==========================================================
+   IMPORT RESULT
+========================================================== */
+
+function showImportResult() {
+
+    document.getElementById(
+        "dropZone"
+    ).classList.add(
+        "hidden"
+    );
 
 
     document.getElementById(
-        "pendingCount"
-    ).textContent = pending;
+        "importResult"
+    ).classList.remove(
+        "hidden"
+    );
+
+
+    renderImportResult();
+
+}
+
+
+function renderImportResult() {
+
+    if (!state.file) {
+        return;
+    }
 
 
     document.getElementById(
-        "processingCount"
-    ).textContent = processing;
-
-
-    document.getElementById(
-        "completedCount"
-    ).textContent = completed;
-
-
-    document.getElementById(
-        "navPendingCount"
-    ).textContent = pending;
-
-
-    document.getElementById(
-        "queueCount"
+        "importedFileName"
     ).textContent =
-        pending + processing;
+        state.file.name;
+
+
+    document.getElementById(
+        "importedFileInfo"
+    ).textContent =
+        `${state.lines.length} ligne(s) détectée(s) • ${state.file.importedAt}`;
+
+
+    const grid =
+        document.getElementById(
+            "sourceInfoGrid"
+        );
+
+
+    grid.innerHTML = "";
+
+
+    const fields = [
+
+        [
+            "Nom CSP",
+            state.source.nomCSP
+        ],
+
+        [
+            "Contrat BAD",
+            state.source.contratBAD
+        ],
+
+        [
+            "IDT connexion",
+            state.source.idtConnexion
+        ],
+
+        [
+            "MDP CSP",
+            state.source.mdpCSP
+        ],
+
+        [
+            "N° Abonné CSP",
+            state.source.numeroAbonneCSP
+        ],
+
+        [
+            "IBAN prélèvement",
+            state.source.iban
+        ]
+
+    ];
+
+
+    fields.forEach(
+        ([label, value]) => {
+
+            grid.insertAdjacentHTML(
+                "beforeend",
+                `
+
+                <div class="source-item">
+
+                    <span>
+                        ${escapeHTML(label)}
+                    </span>
+
+                    <strong
+                        title="${escapeHTML(value || "")}"
+                    >
+                        ${escapeHTML(value || "Non détecté")}
+                    </strong>
+
+                </div>
+
+                `
+            );
+
+        }
+    );
+
+
+    document.getElementById(
+        "detectedCount"
+    ).textContent =
+        `${state.lines.length} ligne(s)`;
+
+
+    const table =
+        document.getElementById(
+            "importPreviewTable"
+        );
+
+
+    table.innerHTML = "";
+
+
+    state.lines.forEach(
+        (item, index) => {
+
+            table.insertAdjacentHTML(
+                "beforeend",
+                `
+
+                <tr>
+
+                    <td>
+                        ${index + 1}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.line.siret)}
+                    </td>
+
+                    <td>
+                        <strong>
+                            ${escapeHTML(item.line.raisonSociale)}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.line.typeFacture || "—")}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(item.line.dateLimite || "—")}
+                    </td>
+
+                </tr>
+
+                `
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   RESET IMPORT
+========================================================== */
+
+function resetImport() {
+
+    state.file =
+        null;
+
+    state.source =
+        {};
+
+    state.lines =
+        [];
+
+    state.validated =
+        false;
+
+
+    excelInput.value =
+        "";
+
+
+    saveState();
+
+
+    document.getElementById(
+        "importResult"
+    ).classList.add(
+        "hidden"
+    );
+
+
+    document.getElementById(
+        "dropZone"
+    ).classList.remove(
+        "hidden"
+    );
+
+
+    renderAll();
+
+
+    showToast(
+        "Import annulé."
+    );
+
+}
+
+
+/* ==========================================================
+   GO ASSIGNMENTS
+========================================================== */
+
+function goToAssignments() {
+
+    if (
+        state.lines.length === 0
+    ) {
+
+        showToast(
+            "Aucune ligne à affecter."
+        );
+
+        return;
+
+    }
+
+
+    showPage(
+        "assignments"
+    );
 
 }
 
@@ -2170,757 +3752,321 @@ function updateCounters() {
 
 function renderDashboard() {
 
-    dashboardTable.innerHTML = "";
+    const total =
+        state.lines.length;
 
 
-    const rows =
-        getPendingAssignments()
-            .slice(0, 5);
+    const assigned =
+        state.lines.filter(
+            item =>
+                item.assignedTo
+        ).length;
 
 
-    if (rows.length === 0) {
-
-        dashboardTable.innerHTML = `
-
-            <tr>
-                <td colspan="5"
-                    style="
-                        text-align:center;
-                        color:#9ca3af;
-                        padding:30px;
-                    ">
-                    Aucune ligne à traiter.
-                </td>
-            </tr>
-
-        `;
-
-        return;
-
-    }
+    const unassigned =
+        total - assigned;
 
 
-    rows.forEach(item => {
-
-        const status =
-            item.status === "processing"
-                ? `
-                    <span class="status processing-status">
-                        En cours
-                    </span>
-                  `
-                : `
-                    <span class="status pending-status">
-                        À traiter
-                    </span>
-                  `;
+    document.getElementById(
+        "totalLines"
+    ).textContent =
+        total;
 
 
-        dashboardTable.insertAdjacentHTML(
-            "beforeend",
-            `
+    document.getElementById(
+        "assignedCount"
+    ).textContent =
+        assigned;
 
-            <tr>
 
-                <td>
-                    ${escapeHTML(item.line.siret)}
-                </td>
+    document.getElementById(
+        "unassignedCount"
+    ).textContent =
+        unassigned;
 
-                <td>
-                    <strong>
-                        ${escapeHTML(item.line.raisonSociale)}
-                    </strong>
-                </td>
 
-                <td>
-                    ${escapeHTML(item.line.typeFacture)}
-                </td>
+    document.getElementById(
+        "agentCount"
+    ).textContent =
+        state.agents.length;
 
-                <td>
-                    ${escapeHTML(item.line.dateLimite)}
-                </td>
 
-                <td>
-                    ${status}
-                </td>
+    document.getElementById(
+        "unassignedNavCount"
+    ).textContent =
+        unassigned;
 
-            </tr>
 
-            `
+    const noFile =
+        document.getElementById(
+            "noFileDashboard"
         );
 
-    });
 
-}
-
-
-/* ==========================================================
-   PENDING LIST
-========================================================== */
-
-function renderPendingList() {
-
-    pendingList.innerHTML = "";
+    const currentFile =
+        document.getElementById(
+            "currentFileDashboard"
+        );
 
 
-    const search =
-        pendingSearch.value
-            .trim()
-            .toLowerCase();
+    if (state.file) {
+
+        noFile.classList.add(
+            "hidden"
+        );
 
 
-    const items =
-        getPendingAssignments()
-            .filter(item => {
-
-                const siret =
-                    item.line.siret
-                        .toLowerCase();
-
-                const company =
-                    item.line.raisonSociale
-                        .toLowerCase();
+        currentFile.classList.remove(
+            "hidden"
+        );
 
 
-                return (
-                    siret.includes(search) ||
-                    company.includes(search)
-                );
-
-            });
+        document.getElementById(
+            "dashboardFileName"
+        ).textContent =
+            state.file.name;
 
 
-    if (items.length === 0) {
-
-        pendingList.innerHTML = `
-
-            <div style="
-                padding:35px 15px;
-                text-align:center;
-                color:#9ca3af;
-                font-size:11px;
-            ">
-                Aucune ligne trouvée.
-            </div>
-
-        `;
-
-        return;
-
-    }
+        document.getElementById(
+            "dashboardFileMeta"
+        ).textContent =
+            `${state.lines.length} lignes • Importé le ${state.file.importedAt}`;
 
 
-    items.forEach(item => {
-
-        const element =
-            document.createElement("div");
-
-
-        element.className =
-            "pending-item";
-
-
-        if (
-            selectedLineId === item.id
-        ) {
-            element.classList.add(
-                "selected"
+        const status =
+            document.getElementById(
+                "fileStatus"
             );
-        }
 
 
-        const status =
-            item.status === "processing"
-                ? `
-                    <span class="status processing-status">
-                        En cours
-                    </span>
-                  `
-                : `
-                    <span class="status pending-status">
-                        À traiter
-                    </span>
-                  `;
+        status.textContent =
+            "Fichier chargé";
 
 
-        element.innerHTML = `
-
-            <div class="pending-item-top">
-
-                <span class="pending-company">
-                    ${escapeHTML(item.line.raisonSociale)}
-                </span>
-
-                ${status}
-
-            </div>
-
-            <div class="pending-siret">
-                SIRET :
-                ${escapeHTML(item.line.siret)}
-            </div>
-
-            <div class="pending-meta">
-
-                <span>
-                    Facture :
-                    ${escapeHTML(item.line.typeFacture)}
-                </span>
-
-                <span>
-                    ${escapeHTML(item.line.dateLimite)}
-                </span>
-
-            </div>
-
-        `;
-
-
-        element.addEventListener(
-            "click",
-            () => selectLine(item.id)
-        );
-
-
-        pendingList.appendChild(element);
-
-    });
-
-}
-
-
-/* ==========================================================
-   SELECT LINE
-========================================================== */
-
-function selectLine(id) {
-
-    const item =
-        state.assignments.find(
-            row => row.id === id
-        );
-
-
-    if (!item) {
-        return;
-    }
-
-
-    /*
-        If another line is already actively being processed,
-        don't allow a second treatment.
-    */
-
-    if (
-        state.activeTreatmentId &&
-        state.activeTreatmentId !== id
-    ) {
-
-        showToast(
-            "Une autre ligne est déjà en cours de traitement."
-        );
-
-        return;
-
-    }
-
-
-    selectedLineId = id;
-
-
-    renderPendingList();
-
-    displaySelectedLine(item);
-
-}
-
-
-/* ==========================================================
-   DISPLAY DETAILS
-========================================================== */
-
-function displaySelectedLine(item) {
-
-    emptySelection.classList.add(
-        "hidden"
-    );
-
-
-    selectedDetails.classList.remove(
-        "hidden"
-    );
-
-
-    document.getElementById(
-        "selectedCompany"
-    ).textContent =
-        item.line.raisonSociale;
-
-
-    document.getElementById(
-        "selectedSiret"
-    ).textContent =
-        `SIRET : ${item.line.siret}`;
-
-
-    renderInformation(
-        document.getElementById(
-            "sourceInformation"
-        ),
-        [
-            ["Nom CSP", item.source.nomCSP],
-            ["Contrat BAD", item.source.contratBAD],
-            ["IDT Connexion", item.source.idtConnexion],
-            ["MDP CSP", item.source.mdpCSP],
-            ["N° Abonné CSP", item.source.numeroAbonneCSP],
-            ["IBAN prélèvement", item.source.iban]
-        ]
-    );
-
-
-    renderInformation(
-        document.getElementById(
-            "lineInformation"
-        ),
-        [
-            ["Raison sociale", item.line.raisonSociale],
-            ["SIRET", item.line.siret],
-            ["Type facture", item.line.typeFacture],
-            ["Date limite", item.line.dateLimite]
-        ]
-    );
-
-
-    if (item.status === "processing") {
-
-        takeButton.classList.add(
-            "hidden"
-        );
-
-        treatmentForm.classList.remove(
-            "hidden"
-        );
+        status.className =
+            "status success-status";
 
     }
     else {
 
-        takeButton.classList.remove(
+        noFile.classList.remove(
             "hidden"
         );
 
-        treatmentForm.classList.add(
+
+        currentFile.classList.add(
             "hidden"
         );
 
     }
 
-}
 
-
-/* ==========================================================
-   INFO CARDS
-========================================================== */
-
-function renderInformation(
-    container,
-    information
-) {
-
-    container.innerHTML = "";
-
-
-    information.forEach(
-        ([label, value]) => {
-
-            const item =
-                document.createElement("div");
-
-
-            item.className =
-                "info-item";
-
-
-            const labelElement =
-                document.createElement("span");
-
-
-            labelElement.className =
-                "info-label";
-
-
-            labelElement.textContent =
-                label;
-
-
-            const valueElement =
-                document.createElement("span");
-
-
-            valueElement.className =
-                "info-value";
-
-
-            valueElement.textContent =
-                value || "—";
-
-
-            valueElement.title =
-                value || "";
-
-
-            const copy =
-                document.createElement("button");
-
-
-            copy.className =
-                "copy-button";
-
-
-            copy.type = "button";
-
-            copy.title = "Copier";
-
-            copy.textContent = "⧉";
-
-
-            copy.addEventListener(
-                "click",
-                event => {
-
-                    event.stopPropagation();
-
-                    copyValue(
-                        value || ""
-                    );
-
-                }
-            );
-
-
-            item.append(
-                labelElement,
-                valueElement,
-                copy
-            );
-
-
-            container.appendChild(
-                item
-            );
-
-        }
-    );
+    renderDashboardTable();
 
 }
 
 
 /* ==========================================================
-   TAKE LINE
+   DASHBOARD TABLE
 ========================================================== */
 
-function takeSelectedLine() {
+function renderDashboardTable() {
 
-    if (!selectedLineId) {
-
-        showToast(
-            "Sélectionnez une ligne."
+    const table =
+        document.getElementById(
+            "dashboardLines"
         );
 
-        return;
 
-    }
+    table.innerHTML = "";
 
 
     if (
-        state.activeTreatmentId &&
-        state.activeTreatmentId !== selectedLineId
+        state.lines.length === 0
     ) {
 
-        showToast(
-            "Une ligne est déjà en cours."
-        );
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="6"
+                    style="
+                        text-align:center;
+                        padding:30px;
+                        color:#9ca3af;
+                    "
+                >
+                    Aucune ligne importée.
+                </td>
+
+            </tr>
+
+        `;
 
         return;
 
     }
 
 
-    const item =
-        state.assignments.find(
-            row =>
-                row.id === selectedLineId
-        );
+    state.lines
+        .slice(0, 8)
+        .forEach(item => {
+
+            const agent =
+                getAgent(
+                    item.assignedTo
+                );
 
 
-    if (!item) {
-        return;
-    }
+            const status =
+                item.assignedTo
+                    ? `
+                        <span class="status assigned-status">
+                            Affectée
+                        </span>
+                      `
+                    : `
+                        <span class="status unassigned-status">
+                            Non affectée
+                        </span>
+                      `;
 
 
-    item.status =
-        "processing";
+            table.insertAdjacentHTML(
+                "beforeend",
+                `
 
+                <tr>
 
-    state.activeTreatmentId =
-        item.id;
+                    <td>
+                        ${escapeHTML(item.line.siret)}
+                    </td>
 
+                    <td>
+                        <strong>
+                            ${escapeHTML(item.line.raisonSociale)}
+                        </strong>
+                    </td>
 
-    saveState();
+                    <td>
+                        ${escapeHTML(item.line.typeFacture || "—")}
+                    </td>
 
+                    <td>
+                        ${escapeHTML(item.line.dateLimite || "—")}
+                    </td>
 
-    takeButton.classList.add(
-        "hidden"
-    );
+                    <td>
+                        ${agent
+                            ? escapeHTML(agent.name)
+                            : "—"
+                        }
+                    </td>
 
+                    <td>
+                        ${status}
+                    </td>
 
-    treatmentForm.classList.remove(
-        "hidden"
-    );
+                </tr>
 
+                `
+            );
 
-    /*
-        Useful information is prefilled,
-        but the agent can modify it.
-    */
-
-    document.getElementById(
-        "subscriberNumber"
-    ).value =
-        item.source.numeroAbonneCSP || "";
-
-
-    document.getElementById(
-        "idt"
-    ).value =
-        item.source.idtConnexion || "";
-
-
-    document.getElementById(
-        "password"
-    ).value =
-        item.source.mdpCSP || "";
-
-
-    document.getElementById(
-        "badContract"
-    ).value =
-        item.source.contratBAD || "";
-
-
-    document.getElementById(
-        "csp"
-    ).value =
-        item.source.nomCSP || "";
-
-
-    renderAll();
-
-
-    showToast(
-        "Ligne prise en charge."
-    );
+        });
 
 }
 
 
 /* ==========================================================
-   CANCEL TREATMENT
+   ASSIGNMENTS
 ========================================================== */
 
-function cancelTreatment() {
-
-    if (!state.activeTreatmentId) {
-        return;
-    }
+let selectedLines =
+    new Set();
 
 
-    const item =
-        state.assignments.find(
-            row =>
-                row.id ===
-                state.activeTreatmentId
-        );
+function renderAssignments() {
+
+    const total =
+        state.lines.length;
 
 
-    if (item) {
-        item.status = "pending";
-    }
+    const assigned =
+        state.lines.filter(
+            line =>
+                line.assignedTo
+        ).length;
 
 
-    state.activeTreatmentId =
-        null;
+    const unassigned =
+        total - assigned;
 
 
-    clearForm();
-
-    saveState();
-
-    renderAll();
-
-
-    if (item) {
-        displaySelectedLine(item);
-    }
+    document.getElementById(
+        "assignmentTotal"
+    ).textContent =
+        total;
 
 
-    showToast(
-        "Traitement annulé."
-    );
+    document.getElementById(
+        "assignmentAssigned"
+    ).textContent =
+        assigned;
+
+
+    document.getElementById(
+        "assignmentUnassigned"
+    ).textContent =
+        unassigned;
+
+
+    renderAgentSelects();
+
+    renderAssignmentTable();
+
+    updateAssignmentValidation();
 
 }
 
 
 /* ==========================================================
-   COMPLETE
+   ASSIGNMENT TABLE
 ========================================================== */
 
-function completeTreatment() {
+function renderAssignmentTable() {
 
-    if (!state.activeTreatmentId) {
-
-        showToast(
-            "Aucun traitement en cours."
-        );
-
-        return;
-
-    }
-
-
-    const formData = {
-
-        numeroAbonne:
-            valueOf("subscriberNumber"),
-
-        idt:
-            valueOf("idt"),
-
-        mdp:
-            valueOf("password"),
-
-        contratBAD:
-            valueOf("badContract"),
-
-        csp:
-            valueOf("csp"),
-
-        commentaire:
-            valueOf("comment")
-
-    };
-
-
-    if (
-        !formData.numeroAbonne ||
-        !formData.idt ||
-        !formData.mdp ||
-        !formData.contratBAD ||
-        !formData.csp
-    ) {
-
-        showToast(
-            "Veuillez compléter tous les champs obligatoires."
-        );
-
-        return;
-
-    }
-
-
-    const index =
-        state.assignments.findIndex(
-            row =>
-                row.id ===
-                state.activeTreatmentId
+    const table =
+        document.getElementById(
+            "assignmentTable"
         );
 
 
-    if (index === -1) {
-        return;
-    }
-
-
-    const item =
-        state.assignments[index];
-
-
-    const completedItem = {
-
-        ...item,
-
-        status:
-            "completed",
-
-        treatment:
-            formData,
-
-        completedBy:
-            AGENT.name,
-
-        completedAt:
-            new Date()
-                .toLocaleString(
-                    "fr-FR"
-                )
-
-    };
-
-
-    state.completed.unshift(
-        completedItem
-    );
-
-
-    state.assignments.splice(
-        index,
-        1
-    );
-
-
-    state.activeTreatmentId =
-        null;
-
-
-    selectedLineId =
-        null;
-
-
-    saveState();
-
-    clearForm();
-
-    closeDetails();
-
-    renderAll();
-
-
-    showToast(
-        "Traitement terminé avec succès."
-    );
-
-}
-
-
-/* ==========================================================
-   HISTORY
-========================================================== */
-
-function renderHistory() {
-
-    historyTable.innerHTML = "";
+    table.innerHTML = "";
 
 
     const search =
-        historySearch.value
-            .trim()
-            .toLowerCase();
+        document.getElementById(
+            "assignmentSearch"
+        )
+        .value
+        .trim()
+        .toLowerCase();
 
 
-    const rows =
-        state.completed.filter(
+    const filter =
+        document.getElementById(
+            "agentFilter"
+        )
+        .value;
+
+
+    const filtered =
+        state.lines.filter(
             item => {
 
-                return (
+                const matchesSearch =
+
                     item.line.siret
                         .toLowerCase()
                         .includes(search)
@@ -2929,26 +4075,59 @@ function renderHistory() {
 
                     item.line.raisonSociale
                         .toLowerCase()
-                        .includes(search)
+                        .includes(search);
+
+
+                let matchesFilter =
+                    true;
+
+
+                if (
+                    filter ===
+                    "unassigned"
+                ) {
+
+                    matchesFilter =
+                        !item.assignedTo;
+
+                }
+                else if (filter) {
+
+                    matchesFilter =
+                        item.assignedTo ===
+                        filter;
+
+                }
+
+
+                return (
+                    matchesSearch &&
+                    matchesFilter
                 );
 
             }
         );
 
 
-    if (rows.length === 0) {
+    if (
+        filtered.length === 0
+    ) {
 
-        historyTable.innerHTML = `
+        table.innerHTML = `
 
             <tr>
-                <td colspan="7"
+
+                <td
+                    colspan="7"
                     style="
                         text-align:center;
                         padding:35px;
                         color:#9ca3af;
-                    ">
-                    Aucun traitement terminé.
+                    "
+                >
+                    Aucune ligne trouvée.
                 </td>
+
             </tr>
 
         `;
@@ -2958,17 +4137,48 @@ function renderHistory() {
     }
 
 
-    rows.forEach(item => {
+    filtered.forEach(
+        item => {
 
-        historyTable.insertAdjacentHTML(
-            "beforeend",
-            `
+            const checked =
+                selectedLines.has(
+                    item.id
+                );
 
-            <tr>
+
+            const row =
+                document.createElement(
+                    "tr"
+                );
+
+
+            if (checked) {
+
+                row.classList.add(
+                    "selected-row"
+                );
+
+            }
+
+
+            row.innerHTML = `
+
+                <td>
+
+                    <input
+                        type="checkbox"
+                        class="line-checkbox"
+                        data-id="${escapeHTML(item.id)}"
+                        ${checked ? "checked" : ""}
+                    >
+
+                </td>
+
 
                 <td>
                     ${escapeHTML(item.line.siret)}
                 </td>
+
 
                 <td>
                     <strong>
@@ -2976,32 +4186,905 @@ function renderHistory() {
                     </strong>
                 </td>
 
-                <td>
-                    ${escapeHTML(item.line.typeFacture)}
-                </td>
 
                 <td>
-                    ${escapeHTML(item.treatment.numeroAbonne)}
+                    ${escapeHTML(item.line.typeFacture || "—")}
                 </td>
+
 
                 <td>
-                    ${escapeHTML(item.treatment.idt)}
+                    ${escapeHTML(item.line.dateLimite || "—")}
                 </td>
+
 
                 <td>
-                    ${escapeHTML(item.treatment.contratBAD)}
+
+                    <select
+                        class="agent-select"
+                        data-line-id="${escapeHTML(item.id)}"
+                    >
+
+                        ${buildAgentOptions(
+                            item.assignedTo
+                        )}
+
+                    </select>
+
                 </td>
+
 
                 <td>
-                    ${escapeHTML(item.completedAt)}
+
+                    ${
+                        item.assignedTo
+
+                        ? `
+                            <span class="status assigned-status">
+                                Affectée
+                            </span>
+                          `
+
+                        : `
+                            <span class="status unassigned-status">
+                                Non affectée
+                            </span>
+                          `
+                    }
+
                 </td>
 
-            </tr>
+            `;
 
-            `
+
+            table.appendChild(
+                row
+            );
+
+        }
+    );
+
+
+    attachAssignmentEvents();
+
+}
+
+
+/* ==========================================================
+   ROW EVENTS
+========================================================== */
+
+function attachAssignmentEvents() {
+
+    document
+        .querySelectorAll(
+            ".line-checkbox"
+        )
+        .forEach(checkbox => {
+
+            checkbox.addEventListener(
+                "change",
+                () => {
+
+                    const id =
+                        checkbox.dataset.id;
+
+
+                    if (
+                        checkbox.checked
+                    ) {
+
+                        selectedLines.add(
+                            id
+                        );
+
+                    }
+                    else {
+
+                        selectedLines.delete(
+                            id
+                        );
+
+                    }
+
+
+                    updateSelectedCount();
+
+                    renderAssignmentTable();
+
+                }
+            );
+
+        });
+
+
+    document
+        .querySelectorAll(
+            ".agent-select"
+        )
+        .forEach(select => {
+
+            select.addEventListener(
+                "change",
+                () => {
+
+                    assignLine(
+                        select.dataset.lineId,
+                        select.value
+                    );
+
+                }
+            );
+
+        });
+
+}
+
+
+/* ==========================================================
+   AGENT OPTIONS
+========================================================== */
+
+function buildAgentOptions(
+    selectedAgent
+) {
+
+    let html = `
+
+        <option value="">
+            Non affectée
+        </option>
+
+    `;
+
+
+    state.agents.forEach(
+        agent => {
+
+            html += `
+
+                <option
+                    value="${escapeHTML(agent.id)}"
+                    ${
+                        selectedAgent ===
+                        agent.id
+                            ? "selected"
+                            : ""
+                    }
+                >
+                    ${escapeHTML(agent.name)}
+                </option>
+
+            `;
+
+        }
+    );
+
+
+    return html;
+
+}
+
+
+/* ==========================================================
+   ASSIGN ONE
+========================================================== */
+
+function assignLine(
+    lineId,
+    agentId
+) {
+
+    const line =
+        state.lines.find(
+            item =>
+                item.id === lineId
         );
 
+
+    if (!line) {
+        return;
+    }
+
+
+    line.assignedTo =
+        agentId || null;
+
+
+    line.status =
+        agentId
+            ? "assigned"
+            : "unassigned";
+
+
+    state.validated =
+        false;
+
+
+    saveState();
+
+    renderAll();
+
+}
+
+
+/* ==========================================================
+   SELECT ALL
+========================================================== */
+
+document
+    .getElementById(
+        "selectAll"
+    )
+    .addEventListener(
+        "change",
+        event => {
+
+            const checked =
+                event.target.checked;
+
+
+            document
+                .querySelectorAll(
+                    ".line-checkbox"
+                )
+                .forEach(box => {
+
+                    const id =
+                        box.dataset.id;
+
+
+                    if (checked) {
+
+                        selectedLines.add(
+                            id
+                        );
+
+                    }
+                    else {
+
+                        selectedLines.delete(
+                            id
+                        );
+
+                    }
+
+                });
+
+
+            updateSelectedCount();
+
+            renderAssignmentTable();
+
+        }
+    );
+
+
+/* ==========================================================
+   SELECTED COUNT
+========================================================== */
+
+function updateSelectedCount() {
+
+    document.getElementById(
+        "selectedCount"
+    ).textContent =
+        selectedLines.size;
+
+
+    document.getElementById(
+        "bulkAssignButton"
+    ).disabled =
+        selectedLines.size === 0;
+
+}
+
+
+/* ==========================================================
+   BULK ASSIGN
+========================================================== */
+
+function assignSelectedLines() {
+
+    const agentId =
+        document.getElementById(
+            "bulkAgent"
+        ).value;
+
+
+    if (!agentId) {
+
+        showToast(
+            "Sélectionnez un agent."
+        );
+
+        return;
+
+    }
+
+
+    selectedLines.forEach(
+        lineId => {
+
+            const line =
+                state.lines.find(
+                    item =>
+                        item.id === lineId
+                );
+
+
+            if (!line) {
+                return;
+            }
+
+
+            line.assignedTo =
+                agentId;
+
+
+            line.status =
+                "assigned";
+
+        }
+    );
+
+
+    selectedLines.clear();
+
+
+    document.getElementById(
+        "selectAll"
+    ).checked =
+        false;
+
+
+    document.getElementById(
+        "bulkAgent"
+    ).value =
+        "";
+
+
+    state.validated =
+        false;
+
+
+    saveState();
+
+    renderAll();
+
+    updateSelectedCount();
+
+
+    showToast(
+        "Lignes affectées."
+    );
+
+}
+
+
+/* ==========================================================
+   FILTERS
+========================================================== */
+
+document
+    .getElementById(
+        "assignmentSearch"
+    )
+    .addEventListener(
+        "input",
+        renderAssignmentTable
+    );
+
+
+document
+    .getElementById(
+        "agentFilter"
+    )
+    .addEventListener(
+        "change",
+        renderAssignmentTable
+    );
+
+
+/* ==========================================================
+   VALIDATION
+========================================================== */
+
+function updateAssignmentValidation() {
+
+    const button =
+        document.getElementById(
+            "validateAssignmentsButton"
+        );
+
+
+    const message =
+        document.getElementById(
+            "validationMessage"
+        );
+
+
+    if (
+        state.lines.length === 0
+    ) {
+
+        button.disabled =
+            true;
+
+
+        message.textContent =
+            "Aucune ligne à valider.";
+
+        return;
+
+    }
+
+
+    const unassigned =
+        state.lines.filter(
+            line =>
+                !line.assignedTo
+        ).length;
+
+
+    if (
+        unassigned > 0
+    ) {
+
+        button.disabled =
+            true;
+
+
+        message.textContent =
+            `${unassigned} ligne(s) restent à affecter.`;
+
+    }
+    else {
+
+        button.disabled =
+            false;
+
+
+        message.textContent =
+            "Toutes les lignes sont affectées.";
+
+    }
+
+}
+
+
+/* ==========================================================
+   VALIDATE ASSIGNMENTS
+========================================================== */
+
+function validateAssignments() {
+
+    const unassigned =
+        state.lines.some(
+            line =>
+                !line.assignedTo
+        );
+
+
+    if (unassigned) {
+
+        showToast(
+            "Certaines lignes ne sont pas affectées."
+        );
+
+        return;
+
+    }
+
+
+    state.validated =
+        true;
+
+
+    saveState();
+
+
+    /*
+        IMPORTANT:
+
+        Next version:
+        this is where we will create/update
+        the data for each agent in the shared folder.
+
+        Example:
+
+        HAMDANMO -> lines 1, 3, 7
+        YASSINE  -> lines 2, 5
+        SARA     -> lines 4, 6
+    */
+
+
+    showToast(
+        "Affectations validées."
+    );
+
+}
+
+
+/* ==========================================================
+   AGENTS
+========================================================== */
+
+function addAgent() {
+
+    const input =
+        document.getElementById(
+            "newAgentName"
+        );
+
+
+    const name =
+        input.value
+            .trim()
+            .toUpperCase();
+
+
+    if (!name) {
+
+        showToast(
+            "Saisissez le nom de l'agent."
+        );
+
+        return;
+
+    }
+
+
+    const id =
+        createAgentId(
+            name
+        );
+
+
+    const exists =
+        state.agents.some(
+            agent =>
+                agent.id === id
+        );
+
+
+    if (exists) {
+
+        showToast(
+            "Cet agent existe déjà."
+        );
+
+        return;
+
+    }
+
+
+    state.agents.push({
+
+        id,
+        name
+
     });
+
+
+    input.value =
+        "";
+
+
+    saveState();
+
+    renderAll();
+
+
+    showToast(
+        `${name} ajouté.`
+    );
+
+}
+
+
+/* ==========================================================
+   REMOVE AGENT
+========================================================== */
+
+function removeAgent(
+    agentId
+) {
+
+    const agent =
+        getAgent(
+            agentId
+        );
+
+
+    if (!agent) {
+        return;
+    }
+
+
+    const assignedLines =
+        state.lines.filter(
+            line =>
+                line.assignedTo ===
+                agentId
+        );
+
+
+    if (
+        assignedLines.length > 0
+    ) {
+
+        const confirmation =
+            confirm(
+
+                `${agent.name} possède ${assignedLines.length} ligne(s) affectée(s).\n\n` +
+
+                `Les lignes redeviendront non affectées.\n\n` +
+
+                `Continuer ?`
+
+            );
+
+
+        if (!confirmation) {
+            return;
+        }
+
+
+        assignedLines.forEach(
+            line => {
+
+                line.assignedTo =
+                    null;
+
+                line.status =
+                    "unassigned";
+
+            }
+        );
+
+    }
+
+
+    state.agents =
+        state.agents.filter(
+            item =>
+                item.id !== agentId
+        );
+
+
+    saveState();
+
+    renderAll();
+
+
+    showToast(
+        "Agent supprimé."
+    );
+
+}
+
+
+/* ==========================================================
+   RENDER AGENTS
+========================================================== */
+
+function renderAgents() {
+
+    const container =
+        document.getElementById(
+            "agentsList"
+        );
+
+
+    container.innerHTML =
+        "";
+
+
+    document.getElementById(
+        "agentsListCount"
+    ).textContent =
+        `${state.agents.length} agent(s)`;
+
+
+    if (
+        state.agents.length === 0
+    ) {
+
+        container.innerHTML = `
+
+            <div
+                style="
+                    text-align:center;
+                    padding:30px;
+                    color:#9ca3af;
+                    font-size:10px;
+                "
+            >
+                Aucun agent.
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    state.agents.forEach(
+        agent => {
+
+            const count =
+                state.lines.filter(
+                    line =>
+                        line.assignedTo ===
+                        agent.id
+                ).length;
+
+
+            const element =
+                document.createElement(
+                    "div"
+                );
+
+
+            element.className =
+                "agent-item";
+
+
+            element.innerHTML = `
+
+                <div class="agent-item-avatar">
+                    ${escapeHTML(
+                        getInitials(
+                            agent.name
+                        )
+                    )}
+                </div>
+
+
+                <div class="agent-item-info">
+
+                    <strong>
+                        ${escapeHTML(agent.name)}
+                    </strong>
+
+                    <span>
+                        ${count} ligne(s) affectée(s)
+                    </span>
+
+                </div>
+
+
+                <button
+                    class="delete-agent"
+                    type="button"
+                >
+                    Supprimer
+                </button>
+
+            `;
+
+
+            element
+                .querySelector(
+                    ".delete-agent"
+                )
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        removeAgent(
+                            agent.id
+                        );
+
+                    }
+                );
+
+
+            container.appendChild(
+                element
+            );
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
+   AGENT SELECTS
+========================================================== */
+
+function renderAgentSelects() {
+
+    const filter =
+        document.getElementById(
+            "agentFilter"
+        );
+
+
+    const currentFilter =
+        filter.value;
+
+
+    filter.innerHTML = `
+
+        <option value="">
+            Tous les agents
+        </option>
+
+        <option value="unassigned">
+            Non affectées
+        </option>
+
+    `;
+
+
+    state.agents.forEach(
+        agent => {
+
+            filter.insertAdjacentHTML(
+                "beforeend",
+                `
+
+                <option
+                    value="${escapeHTML(agent.id)}"
+                >
+                    ${escapeHTML(agent.name)}
+                </option>
+
+                `
+            );
+
+        }
+    );
+
+
+    filter.value =
+        currentFilter;
+
+
+    const bulk =
+        document.getElementById(
+            "bulkAgent"
+        );
+
+
+    const currentBulk =
+        bulk.value;
+
+
+    bulk.innerHTML = `
+
+        <option value="">
+            Affecter à...
+        </option>
+
+    `;
+
+
+    state.agents.forEach(
+        agent => {
+
+            bulk.insertAdjacentHTML(
+                "beforeend",
+                `
+
+                <option
+                    value="${escapeHTML(agent.id)}"
+                >
+                    ${escapeHTML(agent.name)}
+                </option>
+
+                `
+            );
+
+        }
+    );
+
+
+    bulk.value =
+        currentBulk;
 
 }
 
@@ -3010,113 +5093,142 @@ function renderHistory() {
    HELPERS
 ========================================================== */
 
-function valueOf(id) {
+function getAgent(
+    id
+) {
 
-    return document
-        .getElementById(id)
-        .value
-        .trim();
-
-}
-
-
-function clearForm() {
-
-    [
-        "subscriberNumber",
-        "idt",
-        "password",
-        "badContract",
-        "csp",
-        "comment"
-
-    ].forEach(id => {
-
-        document.getElementById(
-            id
-        ).value = "";
-
-    });
-
-}
+    if (!id) {
+        return null;
+    }
 
 
-function closeDetails() {
-
-    selectedDetails.classList.add(
-        "hidden"
-    );
-
-
-    emptySelection.classList.remove(
-        "hidden"
+    return (
+        state.agents.find(
+            agent =>
+                agent.id === id
+        )
+        ||
+        null
     );
 
 }
 
 
-async function copyValue(value) {
+function createAgentId(
+    name
+) {
 
-    try {
+    return name
+        .normalize("NFD")
+        .replace(
+            /[\u0300-\u036f]/g,
+            ""
+        )
+        .replace(
+            /[^a-zA-Z0-9]/g,
+            "_"
+        )
+        .replace(
+            /_+/g,
+            "_"
+        )
+        .replace(
+            /^_|_$/g,
+            ""
+        )
+        .toUpperCase();
 
-        await navigator.clipboard.writeText(
-            value
-        );
+}
 
 
-        showToast(
-            "Copié dans le presse-papiers."
-        );
+function getInitials(
+    name
+) {
+
+    const words =
+        name
+            .trim()
+            .split(/\s+/);
+
+
+    if (
+        words.length === 1
+    ) {
+
+        return words[0]
+            .substring(0, 2)
+            .toUpperCase();
 
     }
-    catch {
 
-        /*
-            Fallback useful when running
-            directly from a local HTML file.
-        */
 
-        const textarea =
-            document.createElement(
-                "textarea"
+    return (
+        words[0][0] +
+        words[
+            words.length - 1
+        ][0]
+    ).toUpperCase();
+
+}
+
+
+function escapeHTML(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
+}
+
+
+/* ==========================================================
+   DATE
+========================================================== */
+
+function renderDate() {
+
+    document.getElementById(
+        "currentDate"
+    ).textContent =
+        new Date()
+            .toLocaleDateString(
+                "fr-FR",
+                {
+                    weekday:
+                        "long",
+
+                    day:
+                        "2-digit",
+
+                    month:
+                        "long",
+
+                    year:
+                        "numeric"
+                }
             );
-
-
-        textarea.value = value;
-
-        document.body.appendChild(
-            textarea
-        );
-
-
-        textarea.select();
-
-
-        document.execCommand(
-            "copy"
-        );
-
-
-        textarea.remove();
-
-
-        showToast(
-            "Copié dans le presse-papiers."
-        );
-
-    }
-
-}
-
-
-function escapeHTML(value) {
-
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
 
 }
 
@@ -3125,10 +5237,12 @@ function escapeHTML(value) {
    TOAST
 ========================================================== */
 
-let toastTimeout;
+let toastTimer;
 
 
-function showToast(message) {
+function showToast(
+    message
+) {
 
     const toast =
         document.getElementById(
@@ -3146,11 +5260,11 @@ function showToast(message) {
 
 
     clearTimeout(
-        toastTimeout
+        toastTimer
     );
 
 
-    toastTimeout =
+    toastTimer =
         setTimeout(
             () => {
 
@@ -3166,104 +5280,46 @@ function showToast(message) {
 
 
 /* ==========================================================
-   DATE
-========================================================== */
-
-function renderDate() {
-
-    const date =
-        new Date();
-
-
-    document.getElementById(
-        "currentDate"
-    ).textContent =
-        date.toLocaleDateString(
-            "fr-FR",
-            {
-                weekday: "long",
-                day: "2-digit",
-                month: "long",
-                year: "numeric"
-            }
-        );
-
-}
-
-
-/* ==========================================================
-   RENDER
+   RENDER EVERYTHING
 ========================================================== */
 
 function renderAll() {
 
-    updateCounters();
-
     renderDashboard();
 
-    renderPendingList();
+    renderAssignments();
 
-    renderHistory();
+    renderAgents();
 
 }
 
 
 /* ==========================================================
-   EVENTS
+   RESTORE IMPORT VIEW
 ========================================================== */
 
-pendingSearch.addEventListener(
-    "input",
-    renderPendingList
-);
+function restoreImportView() {
 
-
-historySearch.addEventListener(
-    "input",
-    renderHistory
-);
-
-
-/* ==========================================================
-   RESTORE ACTIVE TREATMENT
-========================================================== */
-
-function restoreActiveTreatment() {
-
-    if (!state.activeTreatmentId) {
+    if (!state.file) {
         return;
     }
 
 
-    const item =
-        state.assignments.find(
-            row =>
-                row.id ===
-                state.activeTreatmentId
-        );
+    document.getElementById(
+        "dropZone"
+    ).classList.add(
+        "hidden"
+    );
 
 
-    if (!item) {
-
-        state.activeTreatmentId =
-            null;
-
-        saveState();
-
-        return;
-
-    }
+    document.getElementById(
+        "importResult"
+    ).classList.remove(
+        "hidden"
+    );
 
 
-    selectedLineId =
-        item.id;
-
-
-    /*
-        We don't automatically navigate there.
-        But if the agent opens "À traiter",
-        the active row will be selected.
-    */
+    renderImportResult();
 
 }
 
@@ -3272,28 +5328,30 @@ function restoreActiveTreatment() {
    START
 ========================================================== */
 
-initializeAgent();
-
 renderDate();
 
-restoreActiveTreatment();
+restoreImportView();
 
 renderAll();
 
-Test this Agent V2 first
+What you can test now
 
-You should see one assigned client without importing anything:
+Start with Agents. You'll initially have HAMDANMO, YASSINE, and SARA. Add/remove agents and refresh the page—the list should remain.
 
-> SCI C14
-SIRET 79965994100014
-Type E+R
+Then go to Import Excel and select a workbook structured like your screenshot. The Manager should attempt to find the general CSP information and locate the row containing SIRET + RAISON SOCIALE, then create the client list automatically.
 
+After that, go to Affectations. You can do something like:
 
+SCI C14            → HAMDANMO
+CYBERG             → YASSINE
+JIM                → HAMDANMO
+NAJIRO             → SARA
+SCI NJR            → SARA
 
-The important test is the complete workflow:
+Or select 5–10 checkboxes, choose HAMDANMO, and click Affecter.
 
-À traiter → select SCI C14 → source information appears → Prendre en charge → fields appear/pre-fill → Terminer → disappears from À traiter → appears in Historique.
+Once every line has an agent, Valider les affectations becomes enabled.
 
-The counters should change automatically, and reopening the page should retain the agent's progress through localStorage.
+That last button is deliberately where we'll implement the next critical piece:
 
-Once this behaves exactly how you want, the Manager interface can be built around the same data model. That interface will handle Excel import, source-file recognition, agent management, row selection, individual/bulk assignments, and distribution to these Agent interfaces.
+Manager → shared folder → automatic Agent data, with zero Excel import on the Agent side.
