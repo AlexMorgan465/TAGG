@@ -1,1 +1,5261 @@
-window.showDirectoryPicker().then(x => alert("SUCCÈS : " + x.name)).catch(e => alert(e.name + " : " + e.message))
+Oui. On fige maintenant une version cohérente et simple :
+
+PeopleList/
+├── manager.html
+├── HAMDANMO.html
+├── YASSINE.html
+├── SARA.html
+├── CSS/
+│   ├── manager.css
+│   └── agent.css
+├── JS/
+│   ├── manager.js
+│   └── agent.js
+└── data/
+    └── affectations.js
+
+Je te donne d’abord toute la partie Agent, puis toute la partie Manager.
+
+> Important : cette version abandonne complètement showDirectoryPicker(). Le Manager génère affectations.js. Tu remplaces ce fichier dans data/. Les agents n’importent absolument rien.
+
+
+
+
+---
+
+1. AGENT — HAMDANMO.html
+
+Crée HAMDANMO.html à la racine :
+
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Gestion Traitement - HAMDANMO</title>
+
+    <link rel="stylesheet" href="CSS/agent.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="logo">GT</div>
+
+            <div>
+                <strong>Gestion Traitement</strong>
+                <span>Espace Agent</span>
+            </div>
+        </div>
+
+
+        <nav>
+
+            <button
+                class="nav-btn active"
+                data-page="dashboard">
+
+                Tableau de bord
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="pending">
+
+                À traiter
+
+                <span
+                    id="pendingBadge"
+                    class="badge">
+
+                    0
+
+                </span>
+
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="history">
+
+                Historique
+            </button>
+
+        </nav>
+
+
+        <div class="user-box">
+
+            <div
+                id="agentAvatar"
+                class="avatar">
+
+                HA
+            </div>
+
+            <div>
+                <strong id="sidebarAgentName">
+                    HAMDANMO
+                </strong>
+
+                <span>Agent</span>
+            </div>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- MAIN -->
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
+
+                <p id="pageSubtitle">
+                    Suivez vos lignes et vos traitements.
+                </p>
+
+            </div>
+
+            <div class="topbar-right">
+
+                <span id="currentDate"></span>
+
+                <div class="agent-pill">
+                    <span id="topAgentName">
+                        HAMDANMO
+                    </span>
+                </div>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- DASHBOARD -->
+
+        <section
+            id="dashboard"
+            class="page active">
+
+
+            <div class="welcome-card">
+
+                <span>ESPACE AGENT</span>
+
+                <h2>
+                    Bonjour,
+                    <span id="welcomeAgentName">
+                        HAMDANMO
+                    </span>
+                </h2>
+
+                <p>
+                    Retrouvez ici les lignes qui vous
+                    ont été affectées.
+                </p>
+
+            </div>
+
+
+
+            <div class="stats-grid">
+
+                <article class="stat-card">
+
+                    <span>À traiter</span>
+
+                    <strong id="dashboardPending">
+                        0
+                    </strong>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span>En cours</span>
+
+                    <strong id="dashboardCurrent">
+                        0
+                    </strong>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span>Terminées</span>
+
+                    <strong id="dashboardCompleted">
+                        0
+                    </strong>
+
+                </article>
+
+            </div>
+
+
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>Mes lignes à traiter</h2>
+
+                        <p>
+                            Dernières affectations reçues.
+                        </p>
+                    </div>
+
+                    <button
+                        class="secondary-btn"
+                        onclick="showPage('pending')">
+
+                        Voir toutes les lignes
+
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>Date limite</th>
+                            <th>Statut</th>
+                        </tr>
+                        </thead>
+
+                        <tbody id="dashboardPendingTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <!-- À TRAITER -->
+
+        <section
+            id="pending"
+            class="page">
+
+
+            <div class="workspace">
+
+
+                <!-- LISTE -->
+
+                <section class="panel lines-panel">
+
+                    <div class="panel-header">
+
+                        <div>
+                            <h2>À traiter</h2>
+
+                            <p>
+                                Sélectionnez une ligne.
+                            </p>
+                        </div>
+
+                        <input
+                            id="pendingSearch"
+                            class="search-input"
+                            type="search"
+                            placeholder="Rechercher...">
+
+                    </div>
+
+
+                    <div
+                        id="pendingLines"
+                        class="lines-list">
+                    </div>
+
+                </section>
+
+
+
+                <!-- DETAIL -->
+
+                <section class="detail-area">
+
+
+                    <div
+                        id="emptySelection"
+                        class="panel empty-state">
+
+                        <h2>
+                            Sélectionnez une ligne
+                        </h2>
+
+                        <p>
+                            Les informations du fichier
+                            et de la ligne apparaîtront ici.
+                        </p>
+
+                    </div>
+
+
+
+                    <div
+                        id="selectedContent"
+                        class="hidden">
+
+
+                        <!-- SOURCE -->
+
+                        <section class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h2>
+                                        Information fichier Source
+                                    </h2>
+
+                                    <p>
+                                        Informations CSP liées
+                                        au fichier importé.
+                                    </p>
+                                </div>
+
+
+                                <button
+                                    class="secondary-btn"
+                                    onclick="copySourceInformation()">
+
+                                    Copier
+
+                                </button>
+
+                            </div>
+
+
+                            <div
+                                id="sourceInformation"
+                                class="info-grid">
+                            </div>
+
+                        </section>
+
+
+
+                        <!-- LIGNE -->
+
+                        <section class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h2>
+                                        Information ligne sélectionnée
+                                    </h2>
+
+                                    <p>
+                                        Informations du client.
+                                    </p>
+                                </div>
+
+
+                                <button
+                                    class="secondary-btn"
+                                    onclick="copySelectedLine()">
+
+                                    Copier
+
+                                </button>
+
+                            </div>
+
+
+                            <div
+                                id="lineInformation"
+                                class="info-grid">
+                            </div>
+
+
+                            <div class="action-zone">
+
+                                <button
+                                    id="takeButton"
+                                    class="primary-btn"
+                                    onclick="takeSelectedLine()">
+
+                                    Prendre en charge
+
+                                </button>
+
+                            </div>
+
+                        </section>
+
+
+
+                        <!-- SAISIE -->
+
+                        <section
+                            id="treatmentPanel"
+                            class="panel treatment-panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h2>
+                                        Saisie / Traitement
+                                    </h2>
+
+                                    <p>
+                                        Complétez les informations
+                                        avant de terminer.
+                                    </p>
+                                </div>
+
+                            </div>
+
+
+                            <div class="form-grid">
+
+                                <label>
+                                    N° Abonné
+
+                                    <input
+                                        id="inputNumeroAbonne"
+                                        type="text"
+                                        disabled>
+                                </label>
+
+
+                                <label>
+                                    IDT
+
+                                    <input
+                                        id="inputIDT"
+                                        type="text"
+                                        disabled>
+                                </label>
+
+
+                                <label>
+                                    MDP
+
+                                    <input
+                                        id="inputMDP"
+                                        type="text"
+                                        disabled>
+                                </label>
+
+
+                                <label>
+                                    Contrat BAD
+
+                                    <input
+                                        id="inputContratBAD"
+                                        type="text"
+                                        disabled>
+                                </label>
+
+
+                                <label>
+                                    CSP
+
+                                    <input
+                                        id="inputCSP"
+                                        type="text"
+                                        disabled>
+                                </label>
+
+
+                                <label class="full-width">
+                                    Commentaire
+
+                                    <textarea
+                                        id="inputComment"
+                                        rows="3"
+                                        disabled>
+                                    </textarea>
+                                </label>
+
+                            </div>
+
+
+                            <div class="form-actions">
+
+                                <button
+                                    id="cancelButton"
+                                    class="secondary-btn"
+                                    onclick="cancelTreatment()"
+                                    disabled>
+
+                                    Annuler
+
+                                </button>
+
+
+                                <button
+                                    id="finishButton"
+                                    class="primary-btn"
+                                    onclick="finishTreatment()"
+                                    disabled>
+
+                                    Terminer
+
+                                </button>
+
+                            </div>
+
+                        </section>
+
+                    </div>
+
+                </section>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- HISTORIQUE -->
+
+        <section
+            id="history"
+            class="page">
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>
+                            Historique des traitements
+                        </h2>
+
+                        <p>
+                            Lignes terminées par l'agent.
+                        </p>
+                    </div>
+
+
+                    <input
+                        id="historySearch"
+                        class="search-input"
+                        type="search"
+                        placeholder="Rechercher...">
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>N° Abonné</th>
+                            <th>IDT</th>
+                            <th>Contrat BAD</th>
+                            <th>Terminé le</th>
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="historyTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+
+<div
+    id="toast"
+    class="toast">
+</div>
+
+
+<!-- IDENTITE DE CETTE INTERFACE -->
+
+<script>
+    window.CURRENT_AGENT = "HAMDANMO";
+</script>
+
+
+<!-- DONNEES MANAGER -->
+
+<script src="data/affectations.js"></script>
+
+
+<!-- MOTEUR AGENT -->
+
+<script src="JS/agent.js"></script>
+
+</body>
+</html>
+
+
+---
+
+2. Les autres agents
+
+Tu copies exactement HAMDANMO.html.
+
+Pour YASSINE.html, change seulement :
+
+<title>Gestion Traitement - YASSINE</title>
+
+et :
+
+<script>
+    window.CURRENT_AGENT = "YASSINE";
+</script>
+
+Pour SARA.html :
+
+<title>Gestion Traitement - SARA</title>
+
+<script>
+    window.CURRENT_AGENT = "SARA";
+</script>
+
+Tu n'as rien d'autre à modifier.
+
+
+---
+
+3. AGENT — JS/agent.js
+
+Remplace complètement ton ancien agent.js :
+
+"use strict";
+
+
+/* ============================================================
+   CONFIGURATION
+============================================================ */
+
+const AGENT_ID =
+    String(window.CURRENT_AGENT || "")
+        .trim()
+        .toUpperCase();
+
+const STORAGE_KEY =
+    "GT_AGENT_" + AGENT_ID;
+
+
+/* ============================================================
+   STATE LOCAL AGENT
+============================================================ */
+
+let state = {
+    currentId: null,
+    completed: []
+};
+
+let selectedId = null;
+
+
+/* ============================================================
+   CHARGEMENT LOCAL
+============================================================ */
+
+function loadLocalState() {
+
+    try {
+
+        const saved =
+            localStorage.getItem(STORAGE_KEY);
+
+        if (!saved) return;
+
+        const parsed =
+            JSON.parse(saved);
+
+        state.currentId =
+            parsed.currentId || null;
+
+        state.completed =
+            Array.isArray(parsed.completed)
+                ? parsed.completed
+                : [];
+
+    } catch (error) {
+
+        console.error(
+            "Erreur localStorage :",
+            error
+        );
+    }
+}
+
+
+function saveLocalState() {
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(state)
+    );
+}
+
+
+/* ============================================================
+   DONNEES MANAGER
+============================================================ */
+
+function getAgentData() {
+
+    if (!window.AFFECTATIONS) {
+
+        return {
+            id: AGENT_ID,
+            name: AGENT_ID,
+            assignments: []
+        };
+    }
+
+
+    const agents =
+        Array.isArray(window.AFFECTATIONS.agents)
+            ? window.AFFECTATIONS.agents
+            : [];
+
+
+    const agent =
+        agents.find(
+            item =>
+                String(item.id)
+                    .toUpperCase()
+                === AGENT_ID
+        );
+
+
+    if (!agent) {
+
+        return {
+            id: AGENT_ID,
+            name: AGENT_ID,
+            assignments: []
+        };
+    }
+
+
+    return agent;
+}
+
+
+function getAssignments() {
+
+    const agent =
+        getAgentData();
+
+    const completedIds =
+        new Set(
+            state.completed.map(
+                item => item.id
+            )
+        );
+
+
+    return (
+        Array.isArray(agent.assignments)
+            ? agent.assignments
+            : []
+    ).filter(
+        item =>
+            !completedIds.has(item.id)
+    );
+}
+
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+
+function showPage(pageName) {
+
+    document
+        .querySelectorAll(".page")
+        .forEach(page =>
+            page.classList.remove("active")
+        );
+
+
+    document
+        .querySelectorAll(".nav-btn")
+        .forEach(button =>
+            button.classList.remove("active")
+        );
+
+
+    document
+        .getElementById(pageName)
+        ?.classList.add("active");
+
+
+    document
+        .querySelector(
+            `[data-page="${pageName}"]`
+        )
+        ?.classList.add("active");
+
+
+    const information = {
+
+        dashboard: [
+            "Tableau de bord",
+            "Suivez vos lignes et vos traitements."
+        ],
+
+        pending: [
+            "À traiter",
+            "Consultez et traitez les lignes qui vous sont affectées."
+        ],
+
+        history: [
+            "Historique",
+            "Consultez les lignes que vous avez terminées."
+        ]
+    };
+
+
+    if (information[pageName]) {
+
+        document.getElementById(
+            "pageTitle"
+        ).textContent =
+            information[pageName][0];
+
+
+        document.getElementById(
+            "pageSubtitle"
+        ).textContent =
+            information[pageName][1];
+    }
+
+
+    renderAll();
+}
+
+
+function initializeNavigation() {
+
+    document
+        .querySelectorAll(".nav-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () =>
+                    showPage(
+                        button.dataset.page
+                    )
+            );
+        });
+}
+
+
+/* ============================================================
+   IDENTITE
+============================================================ */
+
+function renderIdentity() {
+
+    const agent =
+        getAgentData();
+
+    const name =
+        agent.name || AGENT_ID;
+
+
+    setText(
+        "sidebarAgentName",
+        name
+    );
+
+    setText(
+        "topAgentName",
+        name
+    );
+
+    setText(
+        "welcomeAgentName",
+        name
+    );
+
+
+    setText(
+        "agentAvatar",
+        getInitials(name)
+    );
+}
+
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+
+function renderDashboard() {
+
+    const assignments =
+        getAssignments();
+
+
+    const current =
+        assignments.filter(
+            item =>
+                item.id ===
+                state.currentId
+        );
+
+
+    const pending =
+        assignments.filter(
+            item =>
+                item.id !==
+                state.currentId
+        );
+
+
+    setText(
+        "dashboardPending",
+        pending.length
+    );
+
+    setText(
+        "dashboardCurrent",
+        current.length
+    );
+
+    setText(
+        "dashboardCompleted",
+        state.completed.length
+    );
+
+    setText(
+        "pendingBadge",
+        assignments.length
+    );
+
+
+    const table =
+        document.getElementById(
+            "dashboardPendingTable"
+        );
+
+    if (!table) return;
+
+
+    table.innerHTML = "";
+
+
+    if (assignments.length === 0) {
+
+        table.innerHTML = `
+            <tr>
+                <td colspan="5"
+                    class="empty-table">
+                    Aucune ligne à traiter.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+
+    assignments
+        .slice(0, 5)
+        .forEach(item => {
+
+            const tr =
+                document.createElement("tr");
+
+
+            addCell(
+                tr,
+                item.line?.siret
+            );
+
+            addCell(
+                tr,
+                item.line?.raisonSociale
+            );
+
+            addCell(
+                tr,
+                item.line?.typeFacture
+            );
+
+            addCell(
+                tr,
+                item.line?.dateLimite
+            );
+
+
+            addCell(
+                tr,
+                item.id === state.currentId
+                    ? "En cours"
+                    : "À traiter"
+            );
+
+
+            table.appendChild(tr);
+        });
+}
+
+
+/* ============================================================
+   LISTE A TRAITER
+============================================================ */
+
+function renderPendingLines() {
+
+    const container =
+        document.getElementById(
+            "pendingLines"
+        );
+
+    if (!container) return;
+
+
+    container.innerHTML = "";
+
+
+    const search =
+        normalize(
+            document.getElementById(
+                "pendingSearch"
+            )?.value
+        );
+
+
+    const assignments =
+        getAssignments().filter(item => {
+
+            const text =
+                normalize(
+                    `${item.line?.siret}
+                     ${item.line?.raisonSociale}
+                     ${item.line?.typeFacture}`
+                );
+
+
+            return text.includes(search);
+        });
+
+
+    if (assignments.length === 0) {
+
+        container.innerHTML = `
+            <div class="empty-list">
+                Aucune ligne à traiter.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    assignments.forEach(item => {
+
+        const card =
+            document.createElement("button");
+
+
+        card.className =
+            "line-card";
+
+
+        if (item.id === selectedId) {
+
+            card.classList.add(
+                "selected"
+            );
+        }
+
+
+        if (
+            item.id === state.currentId
+        ) {
+
+            card.classList.add(
+                "current"
+            );
+        }
+
+
+        card.innerHTML = `
+
+            <div class="line-card-top">
+
+                <strong>
+                    ${escapeHtml(
+                        item.line?.raisonSociale ||
+                        "Sans raison sociale"
+                    )}
+                </strong>
+
+                <span>
+                    ${
+                        item.id ===
+                        state.currentId
+
+                            ? "En cours"
+                            : "À traiter"
+                    }
+                </span>
+
+            </div>
+
+            <div class="line-card-details">
+
+                <span>
+                    SIRET :
+                    ${escapeHtml(
+                        item.line?.siret || "—"
+                    )}
+                </span>
+
+                <span>
+                    ${
+                        escapeHtml(
+                            item.line?.typeFacture ||
+                            "—"
+                        )
+                    }
+                </span>
+
+            </div>
+        `;
+
+
+        card.addEventListener(
+            "click",
+            () => {
+
+                selectedId = item.id;
+
+                renderPendingLines();
+
+                renderSelectedLine();
+            }
+        );
+
+
+        container.appendChild(card);
+    });
+}
+
+
+/* ============================================================
+   DETAIL
+============================================================ */
+
+function getSelectedAssignment() {
+
+    return getAssignments().find(
+        item =>
+            item.id === selectedId
+    );
+}
+
+
+function renderSelectedLine() {
+
+    const item =
+        getSelectedAssignment();
+
+
+    const empty =
+        document.getElementById(
+            "emptySelection"
+        );
+
+    const content =
+        document.getElementById(
+            "selectedContent"
+        );
+
+
+    if (!item) {
+
+        empty?.classList.remove(
+            "hidden"
+        );
+
+        content?.classList.add(
+            "hidden"
+        );
+
+        return;
+    }
+
+
+    empty?.classList.add(
+        "hidden"
+    );
+
+    content?.classList.remove(
+        "hidden"
+    );
+
+
+    renderInfo(
+        "sourceInformation",
+        [
+            [
+                "Fichier",
+                item.source?.fileName
+            ],
+
+            [
+                "CSP",
+                item.source?.nomCSP
+            ],
+
+            [
+                "Contrat BAD",
+                item.source?.contratBAD
+            ],
+
+            [
+                "IDT connexion",
+                item.source?.idtConnexion
+            ],
+
+            [
+                "MDP CSP",
+                item.source?.mdpCSP
+            ],
+
+            [
+                "N° Abonné CSP",
+                item.source?.numeroAbonneCSP
+            ],
+
+            [
+                "IBAN",
+                item.source?.iban
+            ]
+        ]
+    );
+
+
+    renderInfo(
+        "lineInformation",
+        [
+            [
+                "SIRET",
+                item.line?.siret
+            ],
+
+            [
+                "Raison sociale",
+                item.line?.raisonSociale
+            ],
+
+            [
+                "Type facture",
+                item.line?.typeFacture
+            ],
+
+            [
+                "N° Abonné",
+                item.line?.numeroAbonne
+            ],
+
+            [
+                "Identifiant",
+                item.line?.identifiant
+            ],
+
+            [
+                "MDP",
+                item.line?.mdp
+            ],
+
+            [
+                "Contrat BAD",
+                item.line?.contratBAD
+            ],
+
+            [
+                "Rattachement CSP",
+                item.line?.rattachement
+            ],
+
+            [
+                "Date limite",
+                item.line?.dateLimite
+            ],
+
+            [
+                "Commentaire",
+                item.line?.commentaire
+            ]
+        ]
+    );
+
+
+    const isCurrent =
+        state.currentId === item.id;
+
+
+    document.getElementById(
+        "takeButton"
+    ).disabled = isCurrent;
+
+
+    document.getElementById(
+        "takeButton"
+    ).textContent =
+        isCurrent
+            ? "✓ En cours de traitement"
+            : "Prendre en charge";
+
+
+    setTreatmentEnabled(
+        isCurrent
+    );
+
+
+    if (isCurrent) {
+
+        prefillTreatment(item);
+    }
+}
+
+
+/* ============================================================
+   PRENDRE EN CHARGE
+============================================================ */
+
+function takeSelectedLine() {
+
+    const item =
+        getSelectedAssignment();
+
+
+    if (!item) {
+
+        showToast(
+            "Sélectionnez une ligne."
+        );
+
+        return;
+    }
+
+
+    if (
+        state.currentId &&
+        state.currentId !== item.id
+    ) {
+
+        showToast(
+            "Terminez d'abord la ligne actuellement en cours."
+        );
+
+        return;
+    }
+
+
+    state.currentId =
+        item.id;
+
+
+    saveLocalState();
+
+    prefillTreatment(item);
+
+    setTreatmentEnabled(true);
+
+    renderAll();
+
+
+    showToast(
+        "Ligne prise en charge."
+    );
+}
+
+
+/* ============================================================
+   PREFILL
+============================================================ */
+
+function prefillTreatment(item) {
+
+    setInput(
+        "inputNumeroAbonne",
+        item.line?.numeroAbonne
+    );
+
+    setInput(
+        "inputIDT",
+        item.line?.identifiant
+    );
+
+    setInput(
+        "inputMDP",
+        item.line?.mdp
+    );
+
+    setInput(
+        "inputContratBAD",
+        item.line?.contratBAD
+    );
+
+    setInput(
+        "inputCSP",
+        item.source?.nomCSP
+    );
+}
+
+
+/* ============================================================
+   TERMINER
+============================================================ */
+
+function finishTreatment() {
+
+    const item =
+        getSelectedAssignment();
+
+
+    if (
+        !item ||
+        state.currentId !== item.id
+    ) {
+
+        showToast(
+            "Aucune ligne en cours."
+        );
+
+        return;
+    }
+
+
+    const result = {
+
+        ...item,
+
+        treatment: {
+
+            numeroAbonne:
+                valueOf(
+                    "inputNumeroAbonne"
+                ),
+
+            idt:
+                valueOf(
+                    "inputIDT"
+                ),
+
+            mdp:
+                valueOf(
+                    "inputMDP"
+                ),
+
+            contratBAD:
+                valueOf(
+                    "inputContratBAD"
+                ),
+
+            csp:
+                valueOf(
+                    "inputCSP"
+                ),
+
+            commentaire:
+                valueOf(
+                    "inputComment"
+                ),
+
+            completedAt:
+                new Date()
+                    .toLocaleString(
+                        "fr-FR"
+                    )
+        }
+    };
+
+
+    state.completed.unshift(
+        result
+    );
+
+
+    state.currentId = null;
+
+    selectedId = null;
+
+
+    saveLocalState();
+
+    clearTreatment();
+
+    renderAll();
+
+
+    showToast(
+        "✓ Traitement terminé."
+    );
+}
+
+
+/* ============================================================
+   ANNULER
+============================================================ */
+
+function cancelTreatment() {
+
+    if (!state.currentId) return;
+
+
+    state.currentId = null;
+
+
+    saveLocalState();
+
+    clearTreatment();
+
+    renderAll();
+
+
+    showToast(
+        "Prise en charge annulée."
+    );
+}
+
+
+/* ============================================================
+   HISTORIQUE
+============================================================ */
+
+function renderHistory() {
+
+    const table =
+        document.getElementById(
+            "historyTable"
+        );
+
+    if (!table) return;
+
+
+    table.innerHTML = "";
+
+
+    const search =
+        normalize(
+            document.getElementById(
+                "historySearch"
+            )?.value
+        );
+
+
+    const rows =
+        state.completed.filter(item => {
+
+            return normalize(
+                `${item.line?.siret}
+                 ${item.line?.raisonSociale}
+                 ${item.treatment?.numeroAbonne}
+                 ${item.treatment?.idt}`
+            ).includes(search);
+        });
+
+
+    if (rows.length === 0) {
+
+        table.innerHTML = `
+            <tr>
+                <td colspan="7"
+                    class="empty-table">
+                    Aucun traitement terminé.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+
+    rows.forEach(item => {
+
+        const tr =
+            document.createElement("tr");
+
+
+        addCell(
+            tr,
+            item.line?.siret
+        );
+
+        addCell(
+            tr,
+            item.line?.raisonSociale
+        );
+
+        addCell(
+            tr,
+            item.line?.typeFacture
+        );
+
+        addCell(
+            tr,
+            item.treatment?.numeroAbonne
+        );
+
+        addCell(
+            tr,
+            item.treatment?.idt
+        );
+
+        addCell(
+            tr,
+            item.treatment?.contratBAD
+        );
+
+        addCell(
+            tr,
+            item.treatment?.completedAt
+        );
+
+
+        table.appendChild(tr);
+    });
+}
+
+
+/* ============================================================
+   COPIE
+============================================================ */
+
+function copySourceInformation() {
+
+    const item =
+        getSelectedAssignment();
+
+    if (!item) return;
+
+
+    const source =
+        item.source || {};
+
+
+    copyText(`
+Fichier : ${source.fileName || ""}
+CSP : ${source.nomCSP || ""}
+Contrat BAD : ${source.contratBAD || ""}
+IDT connexion : ${source.idtConnexion || ""}
+MDP CSP : ${source.mdpCSP || ""}
+N° Abonné CSP : ${source.numeroAbonneCSP || ""}
+IBAN : ${source.iban || ""}
+    `.trim());
+}
+
+
+function copySelectedLine() {
+
+    const item =
+        getSelectedAssignment();
+
+    if (!item) return;
+
+
+    const line =
+        item.line || {};
+
+
+    copyText(`
+SIRET : ${line.siret || ""}
+Raison sociale : ${line.raisonSociale || ""}
+Type : ${line.typeFacture || ""}
+N° Abonné : ${line.numeroAbonne || ""}
+Identifiant : ${line.identifiant || ""}
+MDP : ${line.mdp || ""}
+Contrat BAD : ${line.contratBAD || ""}
+Date limite : ${line.dateLimite || ""}
+Commentaire : ${line.commentaire || ""}
+    `.trim());
+}
+
+
+async function copyText(text) {
+
+    try {
+
+        await navigator.clipboard
+            .writeText(text);
+
+        showToast("Copié.");
+
+    } catch {
+
+        showToast(
+            "Copie impossible."
+        );
+    }
+}
+
+
+/* ============================================================
+   UI HELPERS
+============================================================ */
+
+function renderInfo(
+    containerId,
+    values
+) {
+
+    const container =
+        document.getElementById(
+            containerId
+        );
+
+    if (!container) return;
+
+
+    container.innerHTML = "";
+
+
+    values.forEach(
+        ([label, value]) => {
+
+            const element =
+                document.createElement(
+                    "div"
+                );
+
+            element.className =
+                "info-item";
+
+
+            element.innerHTML = `
+
+                <span class="info-label">
+                    ${escapeHtml(label)}
+                </span>
+
+                <strong class="info-value">
+                    ${escapeHtml(
+                        value || "—"
+                    )}
+                </strong>
+            `;
+
+
+            container.appendChild(
+                element
+            );
+        }
+    );
+}
+
+
+function setTreatmentEnabled(
+    enabled
+) {
+
+    [
+        "inputNumeroAbonne",
+        "inputIDT",
+        "inputMDP",
+        "inputContratBAD",
+        "inputCSP",
+        "inputComment",
+        "cancelButton",
+        "finishButton"
+    ].forEach(id => {
+
+        const element =
+            document.getElementById(id);
+
+        if (element) {
+
+            element.disabled =
+                !enabled;
+        }
+    });
+}
+
+
+function clearTreatment() {
+
+    [
+        "inputNumeroAbonne",
+        "inputIDT",
+        "inputMDP",
+        "inputContratBAD",
+        "inputCSP",
+        "inputComment"
+    ].forEach(id =>
+        setInput(id, "")
+    );
+
+
+    setTreatmentEnabled(false);
+}
+
+
+function addCell(row, value) {
+
+    const td =
+        document.createElement("td");
+
+    td.textContent =
+        value || "—";
+
+    row.appendChild(td);
+}
+
+
+function setText(id, value) {
+
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+
+        element.textContent =
+            value;
+    }
+}
+
+
+function setInput(id, value) {
+
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+
+        element.value =
+            value || "";
+    }
+}
+
+
+function valueOf(id) {
+
+    return (
+        document
+            .getElementById(id)
+            ?.value || ""
+    ).trim();
+}
+
+
+function normalize(value) {
+
+    return String(value || "")
+        .normalize("NFD")
+        .replace(
+            /[\u0300-\u036f]/g,
+            ""
+        )
+        .toLowerCase()
+        .trim();
+}
+
+
+function escapeHtml(value) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent =
+        String(value || "");
+
+    return div.innerHTML;
+}
+
+
+function getInitials(name) {
+
+    const value =
+        String(name || AGENT_ID);
+
+    return value
+        .substring(0, 2)
+        .toUpperCase();
+}
+
+
+/* ============================================================
+   TOAST
+============================================================ */
+
+let toastTimer;
+
+
+function showToast(message) {
+
+    const toast =
+        document.getElementById("toast");
+
+    if (!toast) return;
+
+
+    toast.textContent = message;
+
+    toast.classList.add("show");
+
+
+    clearTimeout(toastTimer);
+
+
+    toastTimer =
+        setTimeout(
+            () =>
+                toast.classList.remove(
+                    "show"
+                ),
+            3000
+        );
+}
+
+
+/* ============================================================
+   RENDER
+============================================================ */
+
+function renderAll() {
+
+    renderIdentity();
+
+    renderDashboard();
+
+    renderPendingLines();
+
+    renderSelectedLine();
+
+    renderHistory();
+}
+
+
+/* ============================================================
+   START
+============================================================ */
+
+function startApplication() {
+
+    if (!AGENT_ID) {
+
+        alert(
+            "Identifiant agent absent."
+        );
+
+        return;
+    }
+
+
+    loadLocalState();
+
+    initializeNavigation();
+
+
+    document
+        .getElementById(
+            "pendingSearch"
+        )
+        ?.addEventListener(
+            "input",
+            renderPendingLines
+        );
+
+
+    document
+        .getElementById(
+            "historySearch"
+        )
+        ?.addEventListener(
+            "input",
+            renderHistory
+        );
+
+
+    setText(
+        "currentDate",
+        new Date()
+            .toLocaleDateString(
+                "fr-FR",
+                {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            )
+    );
+
+
+    renderAll();
+}
+
+
+startApplication();
+
+
+---
+
+4. AGENT — CSS/agent.css
+
+Utilise ceci pour obtenir une interface propre proche de ce que tu avais :
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #f5f7fb;
+    --surface: #ffffff;
+    --sidebar: #0d1220;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --text: #111827;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --success: #16a34a;
+    --warning: #d97706;
+}
+
+body {
+    margin: 0;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+.app {
+    min-height: 100vh;
+    display: flex;
+}
+
+.sidebar {
+    width: 250px;
+    background: var(--sidebar);
+    color: white;
+    padding: 25px 16px;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0 auto 0 0;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+.brand span,
+.user-box span {
+    display: block;
+    color: #8e9aaf;
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    background: var(--primary);
+    font-weight: 700;
+}
+
+.sidebar nav {
+    display: grid;
+    gap: 8px;
+}
+
+.nav-btn {
+    width: 100%;
+    padding: 13px 15px;
+    border: 0;
+    border-radius: 9px;
+    color: #aeb7c7;
+    background: transparent;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+}
+
+.nav-btn:hover,
+.nav-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.badge {
+    background: #ef4444;
+    color: white;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 20px;
+    display: inline-grid;
+    place-items: center;
+    font-size: 11px;
+}
+
+.user-box {
+    margin-top: auto;
+    border-top: 1px solid #222a3a;
+    padding-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #242d40;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+}
+
+.main {
+    margin-left: 250px;
+    width: calc(100% - 250px);
+}
+
+.topbar {
+    min-height: 100px;
+    padding: 25px 35px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.topbar h1 {
+    margin: 0;
+    font-size: 25px;
+}
+
+.topbar p {
+    margin: 6px 0 0;
+    color: var(--muted);
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.agent-pill {
+    background: #eff6ff;
+    color: var(--primary);
+    padding: 9px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.page {
+    display: none;
+    padding: 30px 35px;
+}
+
+.page.active {
+    display: block;
+}
+
+.welcome-card {
+    padding: 30px;
+    background: linear-gradient(135deg, #ffffff, #f1f5ff);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 22px;
+}
+
+.welcome-card > span {
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.welcome-card h2 {
+    margin: 10px 0;
+}
+
+.welcome-card p {
+    color: var(--muted);
+    margin: 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+}
+
+.stat-card span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.stat-card strong {
+    display: block;
+    font-size: 30px;
+    margin-top: 8px;
+}
+
+.panel {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 22px;
+    margin-bottom: 20px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.panel-header p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.primary-btn,
+.secondary-btn {
+    border-radius: 8px;
+    padding: 10px 15px;
+    border: 1px solid transparent;
+}
+
+.primary-btn {
+    background: var(--primary);
+    color: white;
+}
+
+.primary-btn:hover {
+    background: var(--primary-hover);
+}
+
+.secondary-btn {
+    background: white;
+    border-color: var(--border);
+    color: var(--text);
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: #f8fafc;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: left;
+}
+
+th,
+td {
+    padding: 13px;
+    border-bottom: 1px solid var(--border);
+}
+
+td {
+    font-size: 13px;
+}
+
+.empty-table {
+    text-align: center;
+    color: var(--muted);
+    padding: 35px;
+}
+
+.workspace {
+    display: grid;
+    grid-template-columns: 350px minmax(0, 1fr);
+    gap: 20px;
+}
+
+.lines-panel {
+    align-self: start;
+}
+
+.lines-list {
+    display: grid;
+    gap: 10px;
+}
+
+.line-card {
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: left;
+}
+
+.line-card:hover {
+    border-color: #9db7f8;
+}
+
+.line-card.selected {
+    border: 2px solid var(--primary);
+    background: #f7faff;
+}
+
+.line-card.current {
+    box-shadow: inset 4px 0 0 var(--success);
+}
+
+.line-card-top,
+.line-card-details {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.line-card-top span {
+    color: var(--primary);
+    font-size: 11px;
+}
+
+.line-card-details {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.search-input,
+.form-grid input,
+.form-grid textarea {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    outline: none;
+}
+
+.search-input:focus,
+.form-grid input:focus,
+.form-grid textarea:focus {
+    border-color: var(--primary);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.info-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.info-label {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+
+.info-value {
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.action-zone {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.form-grid label {
+    display: grid;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.empty-state {
+    min-height: 300px;
+    display: grid;
+    place-content: center;
+    text-align: center;
+}
+
+.empty-state p,
+.empty-list {
+    color: var(--muted);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.toast {
+    position: fixed;
+    right: 25px;
+    bottom: 25px;
+    background: #111827;
+    color: white;
+    padding: 13px 18px;
+    border-radius: 9px;
+    opacity: 0;
+    transform: translateY(15px);
+    pointer-events: none;
+    transition: .2s;
+    z-index: 1000;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (max-width: 1000px) {
+
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+---
+
+5. data/affectations.js
+
+Pour commencer, crée simplement :
+
+window.AFFECTATIONS = {
+    generatedAt: "",
+    source: {},
+    agents: []
+};
+
+Le Manager remplacera ensuite ce contenu automatiquement dans le fichier qu'il génère.
+
+
+---
+
+6. MANAGER — manager.html
+
+Maintenant le Manager complet :
+
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Gestion Traitement - Manager
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="CSS/manager.css">
+
+
+    <!-- Ton SheetJS qui fonctionnait déjà -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js">
+    </script>
+
+</head>
+
+
+<body>
+
+<div class="app">
+
+
+    <aside class="sidebar">
+
+        <div class="brand">
+
+            <div class="logo">
+                GT
+            </div>
+
+            <div>
+                <strong>
+                    Gestion Traitement
+                </strong>
+
+                <span>
+                    Espace Manager
+                </span>
+            </div>
+
+        </div>
+
+
+        <nav>
+
+            <button
+                class="nav-btn active"
+                data-page="dashboard">
+
+                Tableau de bord
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="import">
+
+                Import Excel
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="assignments">
+
+                Affectations
+
+                <span
+                    id="navUnassignedCount"
+                    class="badge">
+
+                    0
+
+                </span>
+
+            </button>
+
+
+            <button
+                class="nav-btn"
+                data-page="agents">
+
+                Agents
+            </button>
+
+        </nav>
+
+
+        <div class="user-box">
+
+            <div class="avatar">
+                MG
+            </div>
+
+            <div>
+                <strong>Manager</strong>
+                <span>Gestionnaire</span>
+            </div>
+
+        </div>
+
+    </aside>
+
+
+
+    <main class="main">
+
+
+        <header class="topbar">
+
+            <div>
+
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
+
+                <p id="pageSubtitle">
+                    Importez et répartissez les lignes entre les agents.
+                </p>
+
+            </div>
+
+
+            <div class="topbar-actions">
+
+                <span id="currentDate">
+                </span>
+
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()">
+
+                    + Importer Excel
+
+                </button>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- DASHBOARD -->
+
+        <section
+            id="dashboard"
+            class="page active">
+
+
+            <div class="hero">
+
+                <span>
+                    ESPACE MANAGER
+                </span>
+
+                <h2>
+                    Gestion des affectations
+                </h2>
+
+                <p>
+                    Importez le fichier source,
+                    contrôlez les données puis
+                    affectez les lignes aux agents.
+                </p>
+
+
+                <button
+                    class="primary-btn"
+                    onclick="showPage('import')">
+
+                    + Nouvel import
+
+                </button>
+
+            </div>
+
+
+
+            <div class="stats-grid">
+
+                <article class="stat-card">
+
+                    <span>
+                        Lignes importées
+                    </span>
+
+                    <strong id="totalLinesCount">
+                        0
+                    </strong>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span>
+                        Non affectées
+                    </span>
+
+                    <strong id="unassignedCount">
+                        0
+                    </strong>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span>
+                        Affectées
+                    </span>
+
+                    <strong id="assignedCount">
+                        0
+                    </strong>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span>
+                        Agents
+                    </span>
+
+                    <strong id="agentsCount">
+                        0
+                    </strong>
+
+                </article>
+
+            </div>
+
+
+
+            <section class="panel">
+
+                <h2>Dernier import</h2>
+
+                <div
+                    id="dashboardSource"
+                    class="info-grid">
+                </div>
+
+            </section>
+
+
+
+            <section class="panel">
+
+                <h2>
+                    Répartition par agent
+                </h2>
+
+                <div
+                    id="agentDistribution"
+                    class="distribution-list">
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <!-- IMPORT -->
+
+        <section
+            id="import"
+            class="page">
+
+
+            <section
+                id="dropZone"
+                class="import-zone">
+
+                <h2>
+                    Sélectionner un fichier Excel
+                </h2>
+
+                <p>
+                    Formats XLSX, XLS, XLSM
+                </p>
+
+
+                <button
+                    class="primary-btn"
+                    onclick="openImportDialog()">
+
+                    Parcourir
+
+                </button>
+
+
+                <input
+                    id="excelInput"
+                    type="file"
+                    accept=".xlsx,.xls,.xlsm"
+                    hidden>
+
+            </section>
+
+
+
+            <section
+                id="importResult"
+                class="panel hidden">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2 id="importFileName">
+                            Fichier importé
+                        </h2>
+
+                        <p id="importedRowsCount">
+                        </p>
+                    </div>
+
+
+                    <button
+                        class="primary-btn"
+                        onclick="showPage('assignments')">
+
+                        Affecter les lignes
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="sourceInformation"
+                    class="info-grid">
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>N° Abonné</th>
+                            <th>Identifiant</th>
+                            <th>Contrat BAD</th>
+                            <th>Date limite</th>
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="importPreviewTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <!-- AFFECTATIONS -->
+
+        <section
+            id="assignments"
+            class="page">
+
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>
+                            Affectation des lignes
+                        </h2>
+
+                        <p>
+                            Sélectionnez l'agent responsable
+                            de chaque ligne.
+                        </p>
+                    </div>
+
+
+                    <div class="actions">
+
+                        <select id="bulkAgentSelect">
+
+                            <option value="">
+                                Affectation en masse...
+                            </option>
+
+                        </select>
+
+
+                        <button
+                            class="secondary-btn"
+                            onclick="assignSelected()">
+
+                            Affecter sélection
+                        </button>
+
+
+                        <button
+                            id="validateAssignmentsButton"
+                            class="primary-btn"
+                            onclick="validateAssignments()">
+
+                            ✓ Valider les affectations
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="filters">
+
+                    <input
+                        id="assignmentSearch"
+                        type="search"
+                        placeholder="Rechercher...">
+
+
+                    <select id="assignmentFilter">
+
+                        <option value="all">
+                            Toutes
+                        </option>
+
+                        <option value="unassigned">
+                            Non affectées
+                        </option>
+
+                        <option value="assigned">
+                            Affectées
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+
+                            <th>
+                                <input
+                                    id="selectAllLines"
+                                    type="checkbox">
+                            </th>
+
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>Date limite</th>
+                            <th>Agent</th>
+                            <th>Statut</th>
+
+                        </tr>
+
+                        </thead>
+
+
+                        <tbody id="assignmentTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+
+        <!-- AGENTS -->
+
+        <section
+            id="agents"
+            class="page">
+
+
+            <section class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>Agents</h2>
+
+                        <p>
+                            Agents disponibles pour
+                            les affectations.
+                        </p>
+                    </div>
+
+
+                    <button
+                        class="primary-btn"
+                        onclick="showAddAgentForm()">
+
+                        + Ajouter un agent
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="addAgentForm"
+                    class="add-agent-form hidden">
+
+                    <input
+                        id="newAgentId"
+                        placeholder="Identifiant">
+
+                    <input
+                        id="newAgentName"
+                        placeholder="Nom affiché">
+
+
+                    <button
+                        class="primary-btn"
+                        onclick="addAgent()">
+
+                        Ajouter
+
+                    </button>
+
+
+                    <button
+                        class="secondary-btn"
+                        onclick="hideAddAgentForm()">
+
+                        Annuler
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="agentsList"
+                    class="agents-grid">
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<div
+    id="toast"
+    class="toast">
+</div>
+
+
+<script src="JS/manager.js"></script>
+
+</body>
+</html>
+
+
+---
+
+7. MANAGER — JS/manager.js
+
+Voici la version compatible avec les interfaces agents ci-dessus :
+
+"use strict";
+
+
+const STORAGE_KEY =
+    "GT_MANAGER_FINAL";
+
+
+const DEFAULT_AGENTS = [
+
+    {
+        id: "HAMDANMO",
+        name: "HAMDANMO"
+    },
+
+    {
+        id: "YASSINE",
+        name: "YASSINE"
+    },
+
+    {
+        id: "SARA",
+        name: "SARA"
+    }
+
+];
+
+
+let state = loadState();
+
+
+
+/* ============================================================
+   STATE
+============================================================ */
+
+function defaultState() {
+
+    return {
+
+        source: {},
+
+        lines: [],
+
+        agents:
+            structuredClone(
+                DEFAULT_AGENTS
+            )
+    };
+}
+
+
+function loadState() {
+
+    try {
+
+        const saved =
+            localStorage.getItem(
+                STORAGE_KEY
+            );
+
+
+        if (!saved) {
+
+            return defaultState();
+        }
+
+
+        const result =
+            JSON.parse(saved);
+
+
+        result.lines =
+            Array.isArray(result.lines)
+                ? result.lines
+                : [];
+
+
+        result.agents =
+            Array.isArray(result.agents)
+                ? result.agents
+                : structuredClone(
+                    DEFAULT_AGENTS
+                );
+
+
+        result.source =
+            result.source || {};
+
+
+        return result;
+
+    } catch {
+
+        return defaultState();
+    }
+}
+
+
+function saveState() {
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(state)
+    );
+}
+
+
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+
+function showPage(pageName) {
+
+    document
+        .querySelectorAll(".page")
+        .forEach(page =>
+            page.classList.remove(
+                "active"
+            )
+        );
+
+
+    document
+        .querySelectorAll(".nav-btn")
+        .forEach(button =>
+            button.classList.remove(
+                "active"
+            )
+        );
+
+
+    document
+        .getElementById(pageName)
+        ?.classList.add("active");
+
+
+    document
+        .querySelector(
+            `[data-page="${pageName}"]`
+        )
+        ?.classList.add("active");
+
+
+    const pages = {
+
+        dashboard: [
+            "Tableau de bord",
+            "Importez et répartissez les lignes entre les agents."
+        ],
+
+        import: [
+            "Import Excel",
+            "Importez et contrôlez les données du fichier source."
+        ],
+
+        assignments: [
+            "Affectations",
+            "Répartissez les lignes entre les agents."
+        ],
+
+        agents: [
+            "Agents",
+            "Gérez les agents disponibles."
+        ]
+    };
+
+
+    if (pages[pageName]) {
+
+        setText(
+            "pageTitle",
+            pages[pageName][0]
+        );
+
+        setText(
+            "pageSubtitle",
+            pages[pageName][1]
+        );
+    }
+
+
+    renderAll();
+}
+
+
+function initializeNavigation() {
+
+    document
+        .querySelectorAll(".nav-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () =>
+                    showPage(
+                        button.dataset.page
+                    )
+            );
+        });
+}
+
+
+
+/* ============================================================
+   EXCEL
+============================================================ */
+
+function openImportDialog() {
+
+    document
+        .getElementById(
+            "excelInput"
+        )
+        ?.click();
+}
+
+
+function initializeExcel() {
+
+    const input =
+        document.getElementById(
+            "excelInput"
+        );
+
+
+    input?.addEventListener(
+        "change",
+        event => {
+
+            const file =
+                event.target.files[0];
+
+
+            if (file) {
+
+                readExcel(file);
+            }
+
+
+            event.target.value = "";
+        }
+    );
+}
+
+
+function readExcel(file) {
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload = event => {
+
+        try {
+
+            const workbook =
+                XLSX.read(
+                    event.target.result,
+                    {
+                        type: "array"
+                    }
+                );
+
+
+            const sheet =
+                workbook.Sheets[
+                    workbook.SheetNames[0]
+                ];
+
+
+            const rows =
+                XLSX.utils.sheet_to_json(
+                    sheet,
+                    {
+                        header: 1,
+                        defval: "",
+                        raw: false
+                    }
+                );
+
+
+            parseExcel(
+                rows,
+                file.name
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            showToast(
+                "Impossible de lire le fichier Excel."
+            );
+        }
+    };
+
+
+    reader.readAsArrayBuffer(
+        file
+    );
+}
+
+
+
+/* ============================================================
+   PARSING
+============================================================ */
+
+function parseExcel(
+    rows,
+    fileName
+) {
+
+    const headerRow =
+        findHeaderRow(rows);
+
+
+    if (headerRow === -1) {
+
+        showToast(
+            "Tableau client introuvable."
+        );
+
+        return;
+    }
+
+
+    const headers =
+        rows[headerRow];
+
+
+    const columns = {
+
+        siret:
+            findColumn(
+                headers,
+                ["siret"]
+            ),
+
+        raison:
+            findColumn(
+                headers,
+                ["raison sociale"]
+            ),
+
+        type:
+            findColumn(
+                headers,
+                [
+                    "factures en emission",
+                    "e/r/e+r",
+                    "type facture"
+                ]
+            ),
+
+        numero:
+            findColumn(
+                headers,
+                [
+                    "abonne e-factures"
+                ]
+            ),
+
+        identifiant:
+            findColumn(
+                headers,
+                ["identifiant"]
+            ),
+
+        mdp:
+            findColumn(
+                headers,
+                ["mdp"]
+            ),
+
+        contrat:
+            findColumn(
+                headers,
+                [
+                    "contrat b@d",
+                    "contrat bad"
+                ]
+            ),
+
+        rattachement:
+            findColumn(
+                headers,
+                ["rattachement"]
+            ),
+
+        date:
+            findColumn(
+                headers,
+                [
+                    "date limite"
+                ]
+            ),
+
+        commentaire:
+            findColumn(
+                headers,
+                ["commentaire"]
+            )
+    };
+
+
+    if (
+        columns.siret === -1 ||
+        columns.raison === -1
+    ) {
+
+        showToast(
+            "Colonnes client introuvables."
+        );
+
+        return;
+    }
+
+
+    state.source = {
+
+        fileName,
+
+        nomCSP:
+            findNear(
+                rows,
+                ["coordonnees du csp"],
+                true
+            ),
+
+        contratBAD:
+            findNear(
+                rows,
+                [
+                    "contrat bad",
+                    "contrat b@d"
+                ]
+            ),
+
+        idtConnexion:
+            findNear(
+                rows,
+                [
+                    "idt de connexion"
+                ]
+            ),
+
+        mdpCSP:
+            findNear(
+                rows,
+                ["mdp csp"]
+            ),
+
+        numeroAbonneCSP:
+            findNear(
+                rows,
+                [
+                    "abonne csp"
+                ]
+            ),
+
+        iban:
+            findNear(
+                rows,
+                ["iban"]
+            ),
+
+        importedAt:
+            new Date()
+                .toLocaleString(
+                    "fr-FR"
+                )
+    };
+
+
+    /*
+       Dans ton fichier, le nom CSP
+       est généralement au-dessus
+       de "Coordonnées du CSP".
+    */
+
+    state.source.nomCSP =
+        detectCSPName(rows)
+        ||
+        state.source.nomCSP;
+
+
+    const lines = [];
+
+
+    for (
+        let i = headerRow + 1;
+        i < rows.length;
+        i++
+    ) {
+
+        const row =
+            rows[i];
+
+
+        const siret =
+            cell(
+                row,
+                columns.siret
+            );
+
+
+        const raison =
+            cell(
+                row,
+                columns.raison
+            );
+
+
+        if (!siret && !raison) {
+            continue;
+        }
+
+
+        lines.push({
+
+            id:
+                createId(
+                    siret,
+                    raison,
+                    i
+                ),
+
+            assignedTo: null,
+
+            selected: false,
+
+            line: {
+
+                siret,
+
+                raisonSociale:
+                    raison,
+
+                typeFacture:
+                    cell(
+                        row,
+                        columns.type
+                    ),
+
+                numeroAbonne:
+                    cell(
+                        row,
+                        columns.numero
+                    ),
+
+                identifiant:
+                    cell(
+                        row,
+                        columns.identifiant
+                    ),
+
+                mdp:
+                    cell(
+                        row,
+                        columns.mdp
+                    ),
+
+                contratBAD:
+                    cell(
+                        row,
+                        columns.contrat
+                    ),
+
+                rattachement:
+                    cell(
+                        row,
+                        columns.rattachement
+                    ),
+
+                dateLimite:
+                    cell(
+                        row,
+                        columns.date
+                    ),
+
+                commentaire:
+                    cell(
+                        row,
+                        columns.commentaire
+                    )
+            }
+        });
+    }
+
+
+    state.lines = lines;
+
+
+    saveState();
+
+    renderAll();
+
+
+    showPage("import");
+
+
+    showToast(
+        `${lines.length} ligne(s) importée(s).`
+    );
+}
+
+
+
+/* ============================================================
+   DETECTION EXCEL
+============================================================ */
+
+function findHeaderRow(rows) {
+
+    return rows.findIndex(row => {
+
+        const values =
+            row.map(normalize);
+
+
+        return (
+            values.some(
+                value =>
+                    value.includes("siret")
+            )
+
+            &&
+
+            values.some(
+                value =>
+                    value.includes(
+                        "raison sociale"
+                    )
+            )
+        );
+    });
+}
+
+
+function findColumn(
+    headers,
+    names
+) {
+
+    const values =
+        headers.map(normalize);
+
+
+    for (const name of names) {
+
+        const n =
+            normalize(name);
+
+
+        const index =
+            values.findIndex(
+                value =>
+                    value.includes(n)
+            );
+
+
+        if (index !== -1) {
+
+            return index;
+        }
+    }
+
+
+    return -1;
+}
+
+
+function findNear(
+    rows,
+    labels
+) {
+
+    for (const row of rows) {
+
+        for (
+            let c = 0;
+            c < row.length;
+            c++
+        ) {
+
+            const value =
+                normalize(row[c]);
+
+
+            if (
+                labels.some(label =>
+                    value.includes(
+                        normalize(label)
+                    )
+                )
+            ) {
+
+                for (
+                    let x = c + 1;
+                    x < Math.min(
+                        row.length,
+                        c + 5
+                    );
+                    x++
+                ) {
+
+                    if (
+                        String(
+                            row[x] || ""
+                        ).trim()
+                    ) {
+
+                        return String(
+                            row[x]
+                        ).trim();
+                    }
+                }
+            }
+        }
+    }
+
+
+    return "";
+}
+
+
+function detectCSPName(rows) {
+
+    for (
+        let r = 0;
+        r < rows.length;
+        r++
+    ) {
+
+        const row =
+            rows[r];
+
+
+        const found =
+            row.some(value =>
+                normalize(value)
+                    .includes(
+                        "coordonnees du csp"
+                    )
+            );
+
+
+        if (!found) continue;
+
+
+        for (
+            let previous = r - 1;
+            previous >=
+                Math.max(0, r - 4);
+            previous--
+        ) {
+
+            const value =
+                rows[previous]
+                    .find(
+                        cell =>
+                            String(
+                                cell || ""
+                            ).trim()
+                    );
+
+
+            if (value) {
+
+                return String(
+                    value
+                ).trim();
+            }
+        }
+    }
+
+
+    return "";
+}
+
+
+
+/* ============================================================
+   AFFECTATIONS
+============================================================ */
+
+function renderAssignments() {
+
+    const table =
+        document.getElementById(
+            "assignmentTable"
+        );
+
+    if (!table) return;
+
+
+    table.innerHTML = "";
+
+
+    const search =
+        normalize(
+            document.getElementById(
+                "assignmentSearch"
+            )?.value
+        );
+
+
+    const filter =
+        document.getElementById(
+            "assignmentFilter"
+        )?.value || "all";
+
+
+    state.lines
+        .filter(item => {
+
+            const matchesSearch =
+                normalize(
+                    `${item.line.siret}
+                     ${item.line.raisonSociale}`
+                ).includes(search);
+
+
+            const matchesFilter =
+                filter === "all"
+
+                ||
+
+                (
+                    filter === "assigned"
+                    &&
+                    item.assignedTo
+                )
+
+                ||
+
+                (
+                    filter === "unassigned"
+                    &&
+                    !item.assignedTo
+                );
+
+
+            return (
+                matchesSearch &&
+                matchesFilter
+            );
+        })
+
+        .forEach(item => {
+
+            const tr =
+                document.createElement("tr");
+
+
+            const checkboxCell =
+                document.createElement("td");
+
+
+            const checkbox =
+                document.createElement(
+                    "input"
+                );
+
+            checkbox.type =
+                "checkbox";
+
+            checkbox.checked =
+                item.selected;
+
+
+            checkbox.onchange = () => {
+
+                item.selected =
+                    checkbox.checked;
+
+                saveState();
+            };
+
+
+            checkboxCell.appendChild(
+                checkbox
+            );
+
+
+            tr.appendChild(
+                checkboxCell
+            );
+
+
+            addCell(
+                tr,
+                item.line.siret
+            );
+
+            addCell(
+                tr,
+                item.line.raisonSociale
+            );
+
+            addCell(
+                tr,
+                item.line.typeFacture
+            );
+
+            addCell(
+                tr,
+                item.line.dateLimite
+            );
+
+
+            const agentCell =
+                document.createElement("td");
+
+
+            const select =
+                document.createElement(
+                    "select"
+                );
+
+
+            fillAgentSelect(
+                select,
+                item.assignedTo
+            );
+
+
+            select.onchange = () => {
+
+                item.assignedTo =
+                    select.value || null;
+
+                saveState();
+
+                renderAll();
+            };
+
+
+            agentCell.appendChild(
+                select
+            );
+
+
+            tr.appendChild(
+                agentCell
+            );
+
+
+            addCell(
+                tr,
+                item.assignedTo
+                    ? "Affectée"
+                    : "À affecter"
+            );
+
+
+            table.appendChild(tr);
+        });
+}
+
+
+function fillAgentSelect(
+    select,
+    selected
+) {
+
+    select.innerHTML =
+        `<option value="">
+            Non affectée
+        </option>`;
+
+
+    state.agents.forEach(agent => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+
+        option.value =
+            agent.id;
+
+        option.textContent =
+            agent.name;
+
+
+        if (
+            agent.id === selected
+        ) {
+
+            option.selected = true;
+        }
+
+
+        select.appendChild(
+            option
+        );
+    });
+}
+
+
+function assignSelected() {
+
+    const agent =
+        document.getElementById(
+            "bulkAgentSelect"
+        )?.value;
+
+
+    if (!agent) {
+
+        showToast(
+            "Sélectionnez un agent."
+        );
+
+        return;
+    }
+
+
+    const selected =
+        state.lines.filter(
+            line => line.selected
+        );
+
+
+    if (!selected.length) {
+
+        showToast(
+            "Sélectionnez des lignes."
+        );
+
+        return;
+    }
+
+
+    selected.forEach(line => {
+
+        line.assignedTo =
+            agent;
+
+        line.selected =
+            false;
+    });
+
+
+    saveState();
+
+    renderAll();
+
+
+    showToast(
+        `${selected.length} ligne(s) affectée(s).`
+    );
+}
+
+
+
+/* ============================================================
+   GENERATION affectations.js
+============================================================ */
+
+function validateAssignments() {
+
+    if (!state.lines.length) {
+
+        showToast(
+            "Aucune ligne importée."
+        );
+
+        return;
+    }
+
+
+    const missing =
+        state.lines.filter(
+            line =>
+                !line.assignedTo
+        );
+
+
+    if (missing.length) {
+
+        showToast(
+            `${missing.length} ligne(s) non affectée(s).`
+        );
+
+        return;
+    }
+
+
+    const data = {
+
+        generatedAt:
+            new Date()
+                .toLocaleString(
+                    "fr-FR"
+                ),
+
+        agents:
+            state.agents.map(
+                agent => ({
+
+                    id:
+                        agent.id,
+
+                    name:
+                        agent.name,
+
+                    assignments:
+                        state.lines
+
+                            .filter(
+                                item =>
+                                    item.assignedTo ===
+                                    agent.id
+                            )
+
+                            .map(
+                                item => ({
+
+                                    id:
+                                        item.id,
+
+                                    assignedAt:
+                                        new Date()
+                                            .toLocaleString(
+                                                "fr-FR"
+                                            ),
+
+                                    source: {
+                                        ...state.source
+                                    },
+
+                                    line: {
+                                        ...item.line
+                                    }
+                                })
+                            )
+                })
+            )
+    };
+
+
+    const javascript =
+        "window.AFFECTATIONS = "
+        +
+        JSON.stringify(
+            data,
+            null,
+            2
+        )
+        +
+        ";\n";
+
+
+    const blob =
+        new Blob(
+            [javascript],
+            {
+                type:
+                    "text/javascript;charset=utf-8"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement("a");
+
+
+    link.href =
+        url;
+
+    link.download =
+        "affectations.js";
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+    link.remove();
+
+
+    setTimeout(
+        () =>
+            URL.revokeObjectURL(
+                url
+            ),
+        1000
+    );
+
+
+    showToast(
+        "✓ affectations.js généré."
+    );
+}
+
+
+
+/* ============================================================
+   AGENTS
+============================================================ */
+
+function renderAgents() {
+
+    const container =
+        document.getElementById(
+            "agentsList"
+        );
+
+    if (!container) return;
+
+
+    container.innerHTML = "";
+
+
+    state.agents.forEach(agent => {
+
+        const count =
+            state.lines.filter(
+                line =>
+                    line.assignedTo ===
+                    agent.id
+            ).length;
+
+
+        const card =
+            document.createElement(
+                "article"
+            );
+
+
+        card.className =
+            "agent-card";
+
+
+        card.innerHTML = `
+
+            <div class="agent-avatar">
+                ${escapeHtml(
+                    agent.id.substring(
+                        0,
+                        2
+                    )
+                )}
+            </div>
+
+            <h3>
+                ${escapeHtml(
+                    agent.name
+                )}
+            </h3>
+
+            <span>
+                ${escapeHtml(
+                    agent.id
+                )}
+            </span>
+
+            <strong>
+                ${count} ligne(s)
+            </strong>
+
+            <small>
+                ${escapeHtml(
+                    agent.id
+                )}.html
+            </small>
+
+        `;
+
+
+        container.appendChild(
+            card
+        );
+    });
+}
+
+
+function showAddAgentForm() {
+
+    document
+        .getElementById(
+            "addAgentForm"
+        )
+        ?.classList.remove(
+            "hidden"
+        );
+}
+
+
+function hideAddAgentForm() {
+
+    document
+        .getElementById(
+            "addAgentForm"
+        )
+        ?.classList.add(
+            "hidden"
+        );
+}
+
+
+function addAgent() {
+
+    const id =
+        document
+            .getElementById(
+                "newAgentId"
+            )
+            ?.value
+            .trim()
+            .toUpperCase();
+
+
+    const name =
+        document
+            .getElementById(
+                "newAgentName"
+            )
+            ?.value
+            .trim();
+
+
+    if (!id) {
+
+        showToast(
+            "Identifiant obligatoire."
+        );
+
+        return;
+    }
+
+
+    if (
+        state.agents.some(
+            agent =>
+                agent.id === id
+        )
+    ) {
+
+        showToast(
+            "Agent déjà existant."
+        );
+
+        return;
+    }
+
+
+    state.agents.push({
+
+        id,
+
+        name:
+            name || id
+    });
+
+
+    saveState();
+
+    hideAddAgentForm();
+
+    renderAll();
+
+
+    showToast(
+        "Agent ajouté."
+    );
+}
+
+
+
+/* ============================================================
+   DASHBOARD / IMPORT
+============================================================ */
+
+function renderDashboard() {
+
+    setText(
+        "totalLinesCount",
+        state.lines.length
+    );
+
+
+    setText(
+        "assignedCount",
+        state.lines.filter(
+            line =>
+                line.assignedTo
+        ).length
+    );
+
+
+    setText(
+        "unassignedCount",
+        state.lines.filter(
+            line =>
+                !line.assignedTo
+        ).length
+    );
+
+
+    setText(
+        "navUnassignedCount",
+        state.lines.filter(
+            line =>
+                !line.assignedTo
+        ).length
+    );
+
+
+    setText(
+        "agentsCount",
+        state.agents.length
+    );
+
+
+    renderInfo(
+        "dashboardSource",
+        sourceInfo()
+    );
+
+
+    const distribution =
+        document.getElementById(
+            "agentDistribution"
+        );
+
+
+    if (distribution) {
+
+        distribution.innerHTML = "";
+
+
+        state.agents.forEach(agent => {
+
+            const count =
+                state.lines.filter(
+                    line =>
+                        line.assignedTo ===
+                        agent.id
+                ).length;
+
+
+            const div =
+                document.createElement(
+                    "div"
+                );
+
+
+            div.className =
+                "distribution-item";
+
+
+            div.innerHTML = `
+
+                <strong>
+                    ${escapeHtml(
+                        agent.name
+                    )}
+                </strong>
+
+                <span>
+                    ${count} ligne(s)
+                </span>
+            `;
+
+
+            distribution.appendChild(
+                div
+            );
+        });
+    }
+}
+
+
+function renderImport() {
+
+    const result =
+        document.getElementById(
+            "importResult"
+        );
+
+
+    if (!result) return;
+
+
+    result.classList.toggle(
+        "hidden",
+        !state.lines.length
+    );
+
+
+    if (!state.lines.length) {
+        return;
+    }
+
+
+    setText(
+        "importFileName",
+        state.source.fileName
+    );
+
+
+    setText(
+        "importedRowsCount",
+        `${state.lines.length} ligne(s)`
+    );
+
+
+    renderInfo(
+        "sourceInformation",
+        sourceInfo()
+    );
+
+
+    const table =
+        document.getElementById(
+            "importPreviewTable"
+        );
+
+
+    table.innerHTML = "";
+
+
+    state.lines.forEach(item => {
+
+        const tr =
+            document.createElement("tr");
+
+
+        [
+            item.line.siret,
+            item.line.raisonSociale,
+            item.line.typeFacture,
+            item.line.numeroAbonne,
+            item.line.identifiant,
+            item.line.contratBAD,
+            item.line.dateLimite
+        ].forEach(value =>
+            addCell(tr, value)
+        );
+
+
+        table.appendChild(tr);
+    });
+}
+
+
+
+/* ============================================================
+   BULK SELECT
+============================================================ */
+
+function renderBulkAgents() {
+
+    const select =
+        document.getElementById(
+            "bulkAgentSelect"
+        );
+
+
+    if (!select) return;
+
+
+    const current =
+        select.value;
+
+
+    select.innerHTML = `
+
+        <option value="">
+            Affectation en masse...
+        </option>
+    `;
+
+
+    state.agents.forEach(agent => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+
+        option.value =
+            agent.id;
+
+        option.textContent =
+            agent.name;
+
+
+        select.appendChild(
+            option
+        );
+    });
+
+
+    select.value =
+        current;
+}
+
+
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+function sourceInfo() {
+
+    return [
+
+        [
+            "Fichier",
+            state.source.fileName
+        ],
+
+        [
+            "CSP",
+            state.source.nomCSP
+        ],
+
+        [
+            "Contrat BAD",
+            state.source.contratBAD
+        ],
+
+        [
+            "IDT connexion",
+            state.source.idtConnexion
+        ],
+
+        [
+            "MDP CSP",
+            state.source.mdpCSP
+        ],
+
+        [
+            "N° Abonné CSP",
+            state.source.numeroAbonneCSP
+        ],
+
+        [
+            "IBAN",
+            state.source.iban
+        ]
+    ];
+}
+
+
+function renderInfo(
+    id,
+    values
+) {
+
+    const container =
+        document.getElementById(id);
+
+
+    if (!container) return;
+
+
+    container.innerHTML = "";
+
+
+    values.forEach(
+        ([label, value]) => {
+
+            const div =
+                document.createElement(
+                    "div"
+                );
+
+
+            div.className =
+                "info-item";
+
+
+            div.innerHTML = `
+
+                <span>
+                    ${escapeHtml(label)}
+                </span>
+
+                <strong>
+                    ${escapeHtml(
+                        value || "—"
+                    )}
+                </strong>
+            `;
+
+
+            container.appendChild(
+                div
+            );
+        }
+    );
+}
+
+
+function cell(row, index) {
+
+    if (
+        index === -1 ||
+        index === undefined
+    ) {
+
+        return "";
+    }
+
+
+    return String(
+        row[index] || ""
+    ).trim();
+}
+
+
+function normalize(value) {
+
+    return String(value || "")
+        .normalize("NFD")
+        .replace(
+            /[\u0300-\u036f]/g,
+            ""
+        )
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+
+function createId(
+    siret,
+    raison,
+    index
+) {
+
+    return (
+        "L"
+        +
+        index
+        +
+        "_"
+        +
+        String(
+            siret || raison
+        )
+        .replace(
+            /[^a-zA-Z0-9]/g,
+            ""
+        )
+        .substring(0, 30)
+    );
+}
+
+
+function addCell(row, value) {
+
+    const td =
+        document.createElement("td");
+
+    td.textContent =
+        value || "—";
+
+    row.appendChild(td);
+}
+
+
+function setText(id, value) {
+
+    const element =
+        document.getElementById(id);
+
+
+    if (element) {
+
+        element.textContent =
+            value || "";
+    }
+}
+
+
+function escapeHtml(value) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent =
+        String(value || "");
+
+    return div.innerHTML;
+}
+
+
+
+/* ============================================================
+   EVENTS
+============================================================ */
+
+function initializeEvents() {
+
+    document
+        .getElementById(
+            "assignmentSearch"
+        )
+        ?.addEventListener(
+            "input",
+            renderAssignments
+        );
+
+
+    document
+        .getElementById(
+            "assignmentFilter"
+        )
+        ?.addEventListener(
+            "change",
+            renderAssignments
+        );
+
+
+    document
+        .getElementById(
+            "selectAllLines"
+        )
+        ?.addEventListener(
+            "change",
+            event => {
+
+                state.lines.forEach(
+                    line =>
+                        line.selected =
+                            event.target.checked
+                );
+
+
+                saveState();
+
+                renderAssignments();
+            }
+        );
+}
+
+
+
+/* ============================================================
+   TOAST
+============================================================ */
+
+let toastTimer;
+
+
+function showToast(message) {
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+
+    if (!toast) {
+
+        alert(message);
+        return;
+    }
+
+
+    toast.textContent =
+        message;
+
+
+    toast.classList.add(
+        "show"
+    );
+
+
+    clearTimeout(
+        toastTimer
+    );
+
+
+    toastTimer =
+        setTimeout(
+            () =>
+                toast.classList.remove(
+                    "show"
+                ),
+            3000
+        );
+}
+
+
+
+/* ============================================================
+   RENDER ALL
+============================================================ */
+
+function renderAll() {
+
+    renderDashboard();
+
+    renderImport();
+
+    renderBulkAgents();
+
+    renderAssignments();
+
+    renderAgents();
+}
+
+
+
+/* ============================================================
+   START
+============================================================ */
+
+function start() {
+
+    initializeNavigation();
+
+    initializeExcel();
+
+    initializeEvents();
+
+
+    setText(
+        "currentDate",
+        new Date()
+            .toLocaleDateString(
+                "fr-FR",
+                {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                }
+            )
+    );
+
+
+    renderAll();
+}
+
+
+start();
+
+
+---
+
+8. CSS/manager.css
+
+Pour ne pas te faire maintenir deux designs différents, le plus simple maintenant est de copier agent.css vers manager.css, puis d'ajouter ceci à la fin de manager.css :
+
+.hero {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 22px;
+}
+
+.hero > span {
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.hero h2 {
+    margin: 10px 0;
+}
+
+.hero p {
+    color: var(--muted);
+    max-width: 650px;
+}
+
+.stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.topbar-actions,
+.actions,
+.filters,
+.add-agent-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filters {
+    margin-bottom: 18px;
+}
+
+.filters input,
+.filters select,
+.actions select,
+.add-agent-form input {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.distribution-list {
+    display: grid;
+    gap: 10px;
+}
+
+.distribution-item {
+    padding: 14px;
+    background: #f8fafc;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.agents-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.agent-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.agent-card span,
+.agent-card small {
+    display: block;
+    color: var(--muted);
+    margin: 5px 0;
+}
+
+.agent-avatar {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.info-item span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+
+@media (max-width: 1100px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+
+---
+
+Premier test à faire
+
+Ne teste pas tout en même temps.
+
+Ouvre manager.html → importe ton Excel CYBERG → affecte par exemple :
+
+SCI C14    → HAMDANMO
+CYBERG     → HAMDANMO
+JIM        → YASSINE
+NAJIRO     → SARA
+...
+
+Affecte les 12 lignes, puis clique ✓ Valider les affectations.
+
+Tu obtiens :
+
+Téléchargements/
+└── affectations.js
+
+Copie-le et remplace :
+
+PeopleList/
+└── data/
+    └── affectations.js
+
+Puis ferme et rouvre HAMDANMO.html.
+
+À ce moment-là, HAMDANMO doit voir uniquement SCI C14 + CYBERG. YASSINE doit voir JIM, et SARA doit voir NAJIRO. C'est ce test qui valide toute la chaîne Manager → affectations.js → Agent.
