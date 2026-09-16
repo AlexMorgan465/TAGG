@@ -1,509 +1,2818 @@
-Yep. Create a folder such as PeopleList, then create these 3 files inside it.
+Parfait. Voici une V1 complète que tu peux tester directement. Elle reprend le workflow de ton UserForm, mais comme une petite application web.
 
-index.html
+Crée un dossier :
+
+GestionTraitement/
+├── index.html
+├── style.css
+└── script.js
+
+1. index.html
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>People Manager</title>
+
+    <title>Gestion des traitements</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<div class="container">
+<div class="app">
 
-    <div class="header">
-        <div>
-            <h1>People Manager</h1>
-            <p>Manage your list of people</p>
+    <!-- ================= SIDEBAR ================= -->
+
+    <aside class="sidebar">
+
+        <div class="logo">
+            <div class="logo-icon">G</div>
+
+            <div>
+                <strong>Gestion</strong>
+                <span>Traitement</span>
+            </div>
         </div>
 
-        <div class="counter">
-            <span id="peopleCount">0</span>
-            <small>People</small>
-        </div>
-    </div>
+        <nav>
 
+            <button class="nav-item active"
+                    data-page="dashboard">
 
-    <div class="add-section">
+                <span>▦</span>
+                Tableau de bord
 
-        <h2>Add a person</h2>
-
-        <div class="form">
-
-            <input
-                type="text"
-                id="name"
-                placeholder="Full name"
-            >
-
-            <input
-                type="number"
-                id="age"
-                placeholder="Age"
-                min="1"
-            >
-
-            <button id="addBtn">
-                + Add Person
             </button>
 
-        </div>
+            <button class="nav-item"
+                    data-page="traitement">
 
-    </div>
+                <span>☑</span>
+                À traiter
 
+                <span class="badge"
+                      id="sidebarPendingCount">
+                    0
+                </span>
 
-    <div class="list-section">
-
-        <div class="list-header">
-            <h2>People</h2>
-
-            <button id="clearBtn" class="clear-btn">
-                Clear All
             </button>
+
+            <button class="nav-item"
+                    data-page="historique">
+
+                <span>◷</span>
+                Historique
+
+            </button>
+
+        </nav>
+
+        <div class="sidebar-user">
+
+            <div class="avatar">
+                AM
+            </div>
+
+            <div>
+                <strong>Agent</strong>
+                <span>HAMDANMO</span>
+            </div>
+
         </div>
 
-        <div id="peopleList"></div>
+    </aside>
 
-        <div id="emptyMessage" class="empty">
-            No people added yet.
-        </div>
 
-    </div>
+    <!-- ================= MAIN ================= -->
 
+    <main class="main">
+
+        <!-- HEADER -->
+
+        <header class="topbar">
+
+            <div>
+                <h1 id="pageTitle">
+                    Tableau de bord
+                </h1>
+
+                <p id="pageSubtitle">
+                    Vue générale de votre activité
+                </p>
+            </div>
+
+            <div class="date"
+                 id="currentDate">
+            </div>
+
+        </header>
+
+
+        <!-- ================================================= -->
+        <!-- DASHBOARD -->
+        <!-- ================================================= -->
+
+        <section id="dashboard"
+                 class="page active">
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+
+                    <div>
+                        <span class="stat-label">
+                            À traiter
+                        </span>
+
+                        <strong id="pendingCount">
+                            0
+                        </strong>
+                    </div>
+
+                    <div class="stat-icon orange">
+                        ◷
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div>
+                        <span class="stat-label">
+                            En cours
+                        </span>
+
+                        <strong id="currentCount">
+                            0
+                        </strong>
+                    </div>
+
+                    <div class="stat-icon blue">
+                        ↻
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div>
+                        <span class="stat-label">
+                            Traitées
+                        </span>
+
+                        <strong id="completedCount">
+                            0
+                        </strong>
+                    </div>
+
+                    <div class="stat-icon green">
+                        ✓
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>Lignes à traiter</h2>
+                        <p>
+                            Sélectionnez une ligne pour commencer son traitement.
+                        </p>
+                    </div>
+
+                    <button class="primary-btn"
+                            onclick="openTreatmentPage()">
+
+                        Voir les lignes
+
+                    </button>
+
+                </div>
+
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type facture</th>
+                            <th>Date limite</th>
+                            <th>Statut</th>
+                        </tr>
+
+                        </thead>
+
+                        <tbody id="dashboardPendingTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- TRAITEMENT -->
+        <!-- ================================================= -->
+
+        <section id="traitement"
+                 class="page">
+
+            <div class="treatment-layout">
+
+
+                <!-- LEFT -->
+
+                <div class="left-column">
+
+                    <div class="panel">
+
+                        <div class="panel-header">
+
+                            <div>
+                                <h2>À traiter</h2>
+                                <p>
+                                    Sélectionnez une ligne.
+                                </p>
+                            </div>
+
+                            <span class="count-label"
+                                  id="pendingLabel">
+                                0 ligne
+                            </span>
+
+                        </div>
+
+
+                        <div id="pendingList"
+                             class="pending-list">
+                        </div>
+
+                    </div>
+
+
+                    <!-- SAISIE -->
+
+                    <div class="panel">
+
+                        <div class="panel-header">
+
+                            <div>
+                                <h2>Saisie / Traitement</h2>
+                                <p>
+                                    Informations à renseigner par l'agent.
+                                </p>
+                            </div>
+
+                        </div>
+
+
+                        <div class="form-grid">
+
+                            <div class="field">
+
+                                <label>N° Abonné</label>
+
+                                <input id="inputAbonne"
+                                       type="text"
+                                       placeholder="Numéro abonné"
+                                       disabled>
+
+                            </div>
+
+
+                            <div class="field">
+
+                                <label>IDT</label>
+
+                                <input id="inputIDT"
+                                       type="text"
+                                       placeholder="IDT"
+                                       disabled>
+
+                            </div>
+
+
+                            <div class="field">
+
+                                <label>MDP</label>
+
+                                <input id="inputMDP"
+                                       type="text"
+                                       placeholder="Mot de passe"
+                                       disabled>
+
+                            </div>
+
+
+                            <div class="field">
+
+                                <label>Contrat BAD</label>
+
+                                <input id="inputContrat"
+                                       type="text"
+                                       placeholder="Contrat BAD"
+                                       disabled>
+
+                            </div>
+
+
+                            <div class="field">
+
+                                <label>CSP</label>
+
+                                <input id="inputCSP"
+                                       type="text"
+                                       placeholder="CSP"
+                                       disabled>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="action-row">
+
+                            <button id="cancelBtn"
+                                    class="secondary-btn"
+                                    onclick="cancelTreatment()"
+                                    disabled>
+
+                                Annuler
+
+                            </button>
+
+
+                            <button id="finishBtn"
+                                    class="success-btn"
+                                    onclick="finishTreatment()"
+                                    disabled>
+
+                                ✓ Terminer le traitement
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- RIGHT -->
+
+                <div class="right-column">
+
+                    <div id="noSelection"
+                         class="empty-selection">
+
+                        <div class="empty-icon">
+                            ↖
+                        </div>
+
+                        <h3>Aucune ligne sélectionnée</h3>
+
+                        <p>
+                            Sélectionnez une ligne à gauche
+                            pour afficher ses informations.
+                        </p>
+
+                    </div>
+
+
+                    <div id="detailsContainer"
+                         class="details-container hidden">
+
+
+                        <!-- SOURCE -->
+
+                        <div class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h2>
+                                        Informations fichier source
+                                    </h2>
+
+                                    <p>
+                                        Données récupérées automatiquement.
+                                    </p>
+                                </div>
+
+                            </div>
+
+                            <div id="sourceFields">
+                            </div>
+
+                        </div>
+
+
+                        <!-- SELECTED LINE -->
+
+                        <div class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h2>
+                                        Informations ligne sélectionnée
+                                    </h2>
+
+                                    <p>
+                                        Informations de la ligne en cours.
+                                    </p>
+                                </div>
+
+                            </div>
+
+                            <div id="lineFields">
+                            </div>
+
+                        </div>
+
+
+                        <button id="takeBtn"
+                                class="take-btn"
+                                onclick="takeSelectedLine()">
+
+                            Prendre en charge
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- HISTORIQUE -->
+        <!-- ================================================= -->
+
+        <section id="historique"
+                 class="page">
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <h2>Historique des traitements</h2>
+
+                        <p>
+                            Toutes les lignes terminées.
+                        </p>
+                    </div>
+
+                    <input
+                        id="historySearch"
+                        class="search"
+                        placeholder="Rechercher..."
+                        oninput="renderHistory()"
+                    >
+
+                </div>
+
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                        <tr>
+                            <th>SIRET</th>
+                            <th>Raison sociale</th>
+                            <th>Type</th>
+                            <th>N° Abonné</th>
+                            <th>IDT</th>
+                            <th>CSP</th>
+                            <th>Agent</th>
+                            <th>Terminé le</th>
+                        </tr>
+
+                        </thead>
+
+                        <tbody id="historyTable">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<div id="toast"
+     class="toast">
 </div>
 
 
 <script src="script.js"></script>
 
 </body>
+
 </html>
 
-style.css
+
+---
+
+2. style.css
 
 * {
     box-sizing: border-box;
 }
 
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+
+    --background: #f5f7fb;
+    --sidebar: #111827;
+
+    --text: #1f2937;
+    --muted: #6b7280;
+
+    --border: #e5e7eb;
+
+    --success: #16a34a;
+    --danger: #dc2626;
+
+    --white: #ffffff;
+}
+
 body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #f4f6f8;
-    color: #222;
+
+    font-family:
+        Inter,
+        Segoe UI,
+        Arial,
+        sans-serif;
+
+    background: var(--background);
+    color: var(--text);
 }
 
-.container {
-    width: 90%;
-    max-width: 900px;
-    margin: 50px auto;
-}
 
-.header {
+/* ============================================= */
+/* APP */
+/* ============================================= */
+
+.app {
     display: flex;
-    justify-content: space-between;
+    min-height: 100vh;
+}
+
+
+/* ============================================= */
+/* SIDEBAR */
+/* ============================================= */
+
+.sidebar {
+
+    width: 245px;
+
+    background: var(--sidebar);
+    color: white;
+
+    padding: 25px 18px;
+
+    display: flex;
+    flex-direction: column;
+
+    position: fixed;
+
+    top: 0;
+    left: 0;
+    bottom: 0;
+}
+
+
+.logo {
+    display: flex;
     align-items: center;
-    margin-bottom: 30px;
+    gap: 12px;
+
+    padding: 5px 8px 30px;
 }
 
-.header h1 {
-    margin: 0;
-}
 
-.header p {
-    margin-top: 8px;
-    color: #777;
-}
+.logo-icon {
 
-.counter {
-    background: white;
-    padding: 15px 25px;
+    width: 40px;
+    height: 40px;
+
     border-radius: 10px;
-    text-align: center;
-    box-shadow: 0 3px 15px rgba(0,0,0,0.08);
-}
 
-.counter span {
-    display: block;
-    font-size: 25px;
+    background: var(--primary);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
     font-weight: bold;
 }
 
-.counter small {
-    color: #777;
+
+.logo strong {
+    display: block;
+    font-size: 16px;
 }
 
-.add-section,
-.list-section {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    margin-bottom: 25px;
-    box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+.logo span {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+    margin-top: 2px;
 }
 
-.add-section h2,
-.list-section h2 {
-    margin-top: 0;
+
+/* NAVIGATION */
+
+nav {
+    flex: 1;
 }
 
-.form {
+
+.nav-item {
+
+    width: 100%;
+
+    border: none;
+
+    padding: 13px 14px;
+
+    margin-bottom: 6px;
+
+    border-radius: 8px;
+
+    background: transparent;
+
+    color: #9ca3af;
+
     display: flex;
+    align-items: center;
+
+    gap: 12px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    text-align: left;
+}
+
+
+.nav-item:hover {
+    background: #1f2937;
+    color: white;
+}
+
+
+.nav-item.active {
+    background: var(--primary);
+    color: white;
+}
+
+
+.badge {
+
+    margin-left: auto;
+
+    background: #ef4444;
+
+    color: white;
+
+    min-width: 22px;
+    height: 22px;
+
+    padding: 0 6px;
+
+    border-radius: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 11px;
+}
+
+
+/* USER */
+
+.sidebar-user {
+
+    border-top: 1px solid #374151;
+
+    padding-top: 20px;
+
+    display: flex;
+    align-items: center;
+
     gap: 10px;
 }
 
-input {
-    flex: 1;
-    padding: 13px;
-    border: 1px solid #ddd;
-    border-radius: 7px;
-    font-size: 15px;
-    outline: none;
-}
 
-input:focus {
-    border-color: #333;
-}
+.avatar {
 
-button {
-    border: none;
-    background: #222;
-    color: white;
-    padding: 13px 20px;
-    border-radius: 7px;
-    cursor: pointer;
-    font-size: 14px;
-}
+    width: 38px;
+    height: 38px;
 
-button:hover {
-    opacity: 0.85;
-}
+    border-radius: 50%;
 
-.list-header {
+    background: #374151;
+
     display: flex;
-    justify-content: space-between;
     align-items: center;
-}
+    justify-content: center;
 
-.clear-btn {
-    background: transparent;
-    color: #d33;
-    padding: 8px;
-}
-
-.person {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-    padding: 16px;
-    margin-top: 10px;
-
-    border: 1px solid #eee;
-    border-radius: 8px;
-}
-
-.person-info {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.person-name {
+    font-size: 12px;
     font-weight: bold;
 }
 
-.person-age {
-    color: #777;
+
+.sidebar-user strong,
+.sidebar-user span {
+    display: block;
+}
+
+.sidebar-user strong {
+    font-size: 13px;
+}
+
+.sidebar-user span {
+    color: #9ca3af;
+    font-size: 11px;
+    margin-top: 3px;
+}
+
+
+/* ============================================= */
+/* MAIN */
+/* ============================================= */
+
+.main {
+
+    margin-left: 245px;
+
+    width: calc(100% - 245px);
+
+    padding: 32px 38px;
+}
+
+
+.topbar {
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 30px;
+}
+
+
+.topbar h1 {
+    margin: 0;
+    font-size: 26px;
+}
+
+
+.topbar p {
+
+    margin: 6px 0 0;
+
+    color: var(--muted);
+
     font-size: 14px;
 }
 
-.delete-btn {
-    background: #f5f5f5;
-    color: #d33;
-    padding: 8px 12px;
+
+.date {
+
+    background: white;
+
+    padding: 10px 15px;
+
+    border-radius: 8px;
+
+    border: 1px solid var(--border);
+
+    font-size: 13px;
 }
 
-.empty {
+
+/* ============================================= */
+/* PAGES */
+/* ============================================= */
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+
+/* ============================================= */
+/* STATS */
+/* ============================================= */
+
+.stats-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 20px;
+
+    margin-bottom: 25px;
+}
+
+
+.stat-card {
+
+    background: white;
+
+    padding: 22px;
+
+    border-radius: 12px;
+
+    border: 1px solid var(--border);
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+.stat-label {
+
+    display: block;
+
+    color: var(--muted);
+
+    font-size: 13px;
+
+    margin-bottom: 8px;
+}
+
+
+.stat-card strong {
+
+    font-size: 30px;
+}
+
+
+.stat-icon {
+
+    width: 45px;
+    height: 45px;
+
+    border-radius: 10px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 20px;
+}
+
+
+.orange {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.blue {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.green {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+
+/* ============================================= */
+/* PANELS */
+/* ============================================= */
+
+.panel {
+
+    background: white;
+
+    border: 1px solid var(--border);
+
+    border-radius: 12px;
+
+    padding: 22px;
+
+    margin-bottom: 20px;
+}
+
+
+.panel-header {
+
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 20px;
+}
+
+
+.panel-header h2 {
+
+    margin: 0;
+
+    font-size: 17px;
+}
+
+
+.panel-header p {
+
+    margin: 5px 0 0;
+
+    color: var(--muted);
+
+    font-size: 12px;
+}
+
+
+/* ============================================= */
+/* TABLE */
+/* ============================================= */
+
+.table-container {
+    overflow-x: auto;
+}
+
+
+table {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    font-size: 13px;
+}
+
+
+th {
+
+    text-align: left;
+
+    color: #6b7280;
+
+    font-weight: 600;
+
+    background: #f9fafb;
+
+    padding: 12px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+
+td {
+
+    padding: 13px 12px;
+
+    border-bottom: 1px solid #f0f0f0;
+}
+
+
+tbody tr:hover {
+    background: #f9fafb;
+}
+
+
+.status {
+
+    display: inline-block;
+
+    padding: 5px 9px;
+
+    border-radius: 20px;
+
+    font-size: 11px;
+}
+
+
+.status.pending {
+
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+
+.status.completed {
+
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+
+/* ============================================= */
+/* BUTTONS */
+/* ============================================= */
+
+button {
+    font-family: inherit;
+}
+
+
+.primary-btn,
+.success-btn,
+.secondary-btn,
+.take-btn {
+
+    border: none;
+
+    border-radius: 8px;
+
+    padding: 11px 17px;
+
+    cursor: pointer;
+
+    font-weight: 600;
+}
+
+
+.primary-btn {
+
+    background: var(--primary);
+    color: white;
+}
+
+
+.primary-btn:hover {
+    background: var(--primary-dark);
+}
+
+
+.success-btn {
+
+    background: var(--success);
+    color: white;
+}
+
+
+.secondary-btn {
+
+    background: #f3f4f6;
+    color: #374151;
+}
+
+
+button:disabled {
+
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+
+/* ============================================= */
+/* TREATMENT */
+/* ============================================= */
+
+.treatment-layout {
+
+    display: grid;
+
+    grid-template-columns:
+        minmax(430px, 0.9fr)
+        minmax(450px, 1.1fr);
+
+    gap: 22px;
+
+    align-items: start;
+}
+
+
+.pending-list {
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 10px;
+}
+
+
+.pending-item {
+
+    padding: 15px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 9px;
+
+    cursor: pointer;
+
+    transition: .15s;
+}
+
+
+.pending-item:hover {
+
+    border-color: #93c5fd;
+    background: #f8fbff;
+}
+
+
+.pending-item.selected {
+
+    border-color: var(--primary);
+
+    background: #eff6ff;
+}
+
+
+.pending-top {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    margin-bottom: 7px;
+}
+
+
+.pending-company {
+    font-weight: 600;
+}
+
+
+.pending-siret {
+
+    font-size: 12px;
+
+    color: var(--muted);
+}
+
+
+.pending-bottom {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    font-size: 12px;
+
+    color: var(--muted);
+}
+
+
+.count-label {
+
+    background: #f3f4f6;
+
+    padding: 6px 10px;
+
+    border-radius: 20px;
+
+    font-size: 11px;
+}
+
+
+/* ============================================= */
+/* DETAILS */
+/* ============================================= */
+
+.empty-selection {
+
+    background: white;
+
+    border: 1px dashed #d1d5db;
+
+    border-radius: 12px;
+
+    padding: 70px 30px;
+
     text-align: center;
-    padding: 40px;
-    color: #999;
+
+    color: var(--muted);
 }
 
-@media (max-width: 650px) {
 
-    .form {
-        flex-direction: column;
-    }
+.empty-selection h3 {
 
-    .header {
-        align-items: flex-start;
+    color: var(--text);
+
+    margin-bottom: 8px;
+}
+
+
+.empty-icon {
+
+    font-size: 30px;
+
+    margin-bottom: 15px;
+}
+
+
+.hidden {
+    display: none;
+}
+
+
+.info-row {
+
+    display: grid;
+
+    grid-template-columns:
+        150px 1fr 65px;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-bottom: 11px;
+}
+
+
+.info-row label {
+
+    font-size: 12px;
+
+    color: #4b5563;
+}
+
+
+.info-value {
+
+    background: #f9fafb;
+
+    border: 1px solid var(--border);
+
+    border-radius: 7px;
+
+    padding: 10px;
+
+    min-height: 37px;
+
+    font-size: 13px;
+
+    overflow: hidden;
+}
+
+
+.copy-btn {
+
+    border: 1px solid var(--border);
+
+    background: white;
+
+    border-radius: 6px;
+
+    padding: 8px;
+
+    cursor: pointer;
+
+    font-size: 11px;
+}
+
+
+.copy-btn:hover {
+
+    background: #f3f4f6;
+}
+
+
+.take-btn {
+
+    width: 100%;
+
+    padding: 14px;
+
+    background: var(--primary);
+
+    color: white;
+
+    margin-bottom: 20px;
+}
+
+
+/* ============================================= */
+/* FORM */
+/* ============================================= */
+
+.form-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap: 15px;
+}
+
+
+.field label {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-size: 12px;
+
+    font-weight: 600;
+}
+
+
+.field input {
+
+    width: 100%;
+
+    border: 1px solid var(--border);
+
+    border-radius: 7px;
+
+    padding: 11px;
+
+    outline: none;
+
+    font-size: 13px;
+}
+
+
+.field input:focus {
+
+    border-color: var(--primary);
+
+    box-shadow:
+        0 0 0 3px rgba(37, 99, 235, .08);
+}
+
+
+.action-row {
+
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    margin-top: 22px;
+}
+
+
+/* ============================================= */
+/* SEARCH */
+/* ============================================= */
+
+.search {
+
+    width: 220px;
+
+    padding: 10px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 7px;
+
+    outline: none;
+}
+
+
+/* ============================================= */
+/* TOAST */
+/* ============================================= */
+
+.toast {
+
+    position: fixed;
+
+    right: 25px;
+    bottom: 25px;
+
+    background: #111827;
+
+    color: white;
+
+    padding: 12px 18px;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transform: translateY(10px);
+
+    transition: .25s;
+}
+
+
+.toast.show {
+
+    opacity: 1;
+
+    transform: translateY(0);
+}
+
+
+/* ============================================= */
+/* RESPONSIVE */
+/* ============================================= */
+
+@media(max-width: 1000px) {
+
+    .treatment-layout {
+        grid-template-columns: 1fr;
     }
 
 }
 
-script.js
 
-// People that exist the FIRST time the website is opened
-const defaultPeople = [
-    {
-        name: "Amine",
-        age: 22
-    },
-    {
-        name: "Yassine",
-        age: 24
+@media(max-width: 750px) {
+
+    .sidebar {
+        width: 75px;
     }
+
+    .logo div:not(.logo-icon),
+    .nav-item:not(.active) .badge,
+    .nav-item {
+        font-size: 0;
+    }
+
+    .nav-item span {
+        font-size: 18px;
+    }
+
+    .sidebar-user div:not(.avatar) {
+        display: none;
+    }
+
+    .main {
+
+        margin-left: 75px;
+
+        width: calc(100% - 75px);
+
+        padding: 20px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+---
+
+3. script.js
+
+This is where the workflow happens.
+
+/* =========================================================
+   TEST DATA
+   Later we will replace this with your real source.
+========================================================= */
+
+const defaultPendingLines = [
+
+    {
+        id: 1,
+
+        siret: "44193577200059",
+
+        raisonSociale:
+            "HAMMERSCHMIDT (Jacques)",
+
+        typeFacture: "E",
+
+        dateLimite: "06/08/2026",
+
+        source: {
+
+            nomCSP:
+                "CSP-TEST-001",
+
+            contratBAD:
+                "BAD-458796",
+
+            idtConnexion:
+                "IDT-784512",
+
+            numeroAbonneCSP:
+                "7000123456",
+
+            ibanPrelevement:
+                "FR76 3000 4000 5000 6000 7000 890",
+
+            mdpCSP:
+                "TEST1234"
+
+        }
+
+    }
+
 ];
 
 
-// Load saved people
-let people = JSON.parse(localStorage.getItem("people"));
+/* =========================================================
+   STORAGE
+========================================================= */
+
+let pendingLines =
+    JSON.parse(
+        localStorage.getItem("pendingLines")
+    );
 
 
-// If nothing has been saved yet,
-// use our default people
-if (!people) {
-    people = defaultPeople;
-    savePeople();
+let completedLines =
+    JSON.parse(
+        localStorage.getItem("completedLines")
+    ) || [];
+
+
+let currentTreatment =
+    JSON.parse(
+        localStorage.getItem("currentTreatment")
+    ) || null;
+
+
+if (!pendingLines) {
+
+    pendingLines = defaultPendingLines;
+
+    saveData();
+
 }
 
 
-// Elements
-const nameInput = document.getElementById("name");
-const ageInput = document.getElementById("age");
+/* Selected but NOT taken yet */
 
-const addBtn = document.getElementById("addBtn");
-const clearBtn = document.getElementById("clearBtn");
-
-const peopleList = document.getElementById("peopleList");
-const peopleCount = document.getElementById("peopleCount");
-const emptyMessage = document.getElementById("emptyMessage");
+let selectedLineId = null;
 
 
-// SAVE
-function savePeople() {
+/* =========================================================
+   SAVE
+========================================================= */
+
+function saveData() {
 
     localStorage.setItem(
-        "people",
-        JSON.stringify(people)
+        "pendingLines",
+        JSON.stringify(pendingLines)
+    );
+
+
+    localStorage.setItem(
+        "completedLines",
+        JSON.stringify(completedLines)
+    );
+
+
+    localStorage.setItem(
+        "currentTreatment",
+        JSON.stringify(currentTreatment)
     );
 
 }
 
 
-// DISPLAY
-function displayPeople() {
+/* =========================================================
+   NAVIGATION
+========================================================= */
 
-    peopleList.innerHTML = "";
+const navItems =
+    document.querySelectorAll(".nav-item");
 
-    peopleCount.textContent = people.length;
+
+navItems.forEach(button => {
+
+    button.addEventListener("click", () => {
+
+        const page =
+            button.dataset.page;
+
+        showPage(page);
+
+    });
+
+});
 
 
-    // Empty list
-    if (people.length === 0) {
+function showPage(pageName) {
 
-        emptyMessage.style.display = "block";
+    document
+        .querySelectorAll(".page")
+        .forEach(page => {
 
-        return;
+            page.classList.remove("active");
+
+        });
+
+
+    document
+        .querySelectorAll(".nav-item")
+        .forEach(item => {
+
+            item.classList.remove("active");
+
+        });
+
+
+    document
+        .getElementById(pageName)
+        .classList.add("active");
+
+
+    document
+        .querySelector(
+            `[data-page="${pageName}"]`
+        )
+        .classList.add("active");
+
+
+    updatePageTitle(pageName);
+
+}
+
+
+function updatePageTitle(page) {
+
+    const title =
+        document.getElementById("pageTitle");
+
+    const subtitle =
+        document.getElementById("pageSubtitle");
+
+
+    if (page === "dashboard") {
+
+        title.textContent =
+            "Tableau de bord";
+
+        subtitle.textContent =
+            "Vue générale de votre activité";
 
     }
 
 
-    emptyMessage.style.display = "none";
+    if (page === "traitement") {
+
+        title.textContent =
+            "Traitement";
+
+        subtitle.textContent =
+            "Sélection et traitement des lignes";
+
+    }
 
 
-    // Create each person
-    people.forEach((person, index) => {
+    if (page === "historique") {
 
-        const personDiv = document.createElement("div");
+        title.textContent =
+            "Historique";
 
-        personDiv.className = "person";
+        subtitle.textContent =
+            "Consultez les lignes déjà traitées";
+
+    }
+
+}
 
 
-        personDiv.innerHTML = `
+function openTreatmentPage() {
 
-            <div class="person-info">
+    showPage("traitement");
 
-                <span class="person-name">
-                    ${person.name}
+}
+
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+function renderDashboard() {
+
+    document
+        .getElementById("pendingCount")
+        .textContent =
+        pendingLines.length;
+
+
+    document
+        .getElementById("completedCount")
+        .textContent =
+        completedLines.length;
+
+
+    document
+        .getElementById("currentCount")
+        .textContent =
+        currentTreatment ? 1 : 0;
+
+
+    document
+        .getElementById("sidebarPendingCount")
+        .textContent =
+        pendingLines.length;
+
+
+    const table =
+        document.getElementById(
+            "dashboardPendingTable"
+        );
+
+
+    table.innerHTML = "";
+
+
+    pendingLines.forEach(line => {
+
+        table.innerHTML += `
+
+            <tr>
+
+                <td>${line.siret}</td>
+
+                <td>
+                    ${line.raisonSociale}
+                </td>
+
+                <td>
+                    ${line.typeFacture}
+                </td>
+
+                <td>
+                    ${line.dateLimite}
+                </td>
+
+                <td>
+                    <span class="status pending">
+                        À traiter
+                    </span>
+                </td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    if (pendingLines.length === 0) {
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td colspan="5"
+                    style="
+                        text-align:center;
+                        color:#9ca3af;
+                        padding:30px;
+                    ">
+
+                    Aucune ligne à traiter.
+
+                </td>
+
+            </tr>
+
+        `;
+
+    }
+
+}
+
+
+/* =========================================================
+   PENDING LIST
+========================================================= */
+
+function renderPendingLines() {
+
+    const container =
+        document.getElementById(
+            "pendingList"
+        );
+
+
+    container.innerHTML = "";
+
+
+    document
+        .getElementById("pendingLabel")
+        .textContent =
+        `${pendingLines.length} ligne${pendingLines.length > 1 ? "s" : ""}`;
+
+
+    pendingLines.forEach(line => {
+
+        const item =
+            document.createElement("div");
+
+
+        item.className =
+            "pending-item";
+
+
+        if (
+            selectedLineId === line.id
+        ) {
+
+            item.classList.add(
+                "selected"
+            );
+
+        }
+
+
+        item.innerHTML = `
+
+            <div class="pending-top">
+
+                <span class="pending-company">
+                    ${line.raisonSociale}
                 </span>
 
-                <span class="person-age">
-                    ${person.age} years old
+                <span class="status pending">
+                    À traiter
                 </span>
 
             </div>
 
-            <button
-                class="delete-btn"
-                onclick="deletePerson(${index})"
-            >
-                Delete
-            </button>
+
+            <div class="pending-siret">
+
+                SIRET :
+                ${line.siret}
+
+            </div>
+
+
+            <div class="pending-bottom">
+
+                <span>
+                    Facture :
+                    ${line.typeFacture}
+                </span>
+
+                <span>
+                    ${line.dateLimite}
+                </span>
+
+            </div>
 
         `;
 
 
-        peopleList.appendChild(personDiv);
+        item.addEventListener(
+            "click",
+            () => selectLine(line.id)
+        );
+
+
+        container.appendChild(item);
 
     });
+
+
+    if (pendingLines.length === 0) {
+
+        container.innerHTML = `
+
+            <div style="
+                text-align:center;
+                padding:40px;
+                color:#9ca3af;
+            ">
+
+                ✓ Toutes les lignes
+                ont été traitées.
+
+            </div>
+
+        `;
+
+    }
 
 }
 
 
-// ADD PERSON
-function addPerson() {
+/* =========================================================
+   SELECT LINE
+========================================================= */
 
-    const name = nameInput.value.trim();
+function selectLine(id) {
 
-    const age = ageInput.value;
+    /*
+        Prevent selecting another line
+        while a treatment is active.
+    */
 
+    if (currentTreatment) {
 
-    // Validation
-    if (name === "") {
-
-        alert("Please enter a name.");
-
-        nameInput.focus();
-
-        return;
-
-    }
-
-
-    if (age === "" || age <= 0) {
-
-        alert("Please enter a valid age.");
-
-        ageInput.focus();
+        showToast(
+            "Terminez ou annulez d'abord le traitement en cours."
+        );
 
         return;
 
     }
 
 
-    // Create person
-    const newPerson = {
+    selectedLineId = id;
 
-        name: name,
 
-        age: Number(age)
+    renderPendingLines();
+
+
+    const line =
+        pendingLines.find(
+            item => item.id === id
+        );
+
+
+    if (!line) return;
+
+
+    displayLineDetails(line);
+
+}
+
+
+/* =========================================================
+   DISPLAY DETAILS
+========================================================= */
+
+function displayLineDetails(line) {
+
+    document
+        .getElementById("noSelection")
+        .classList.add("hidden");
+
+
+    document
+        .getElementById(
+            "detailsContainer"
+        )
+        .classList.remove("hidden");
+
+
+    const source =
+        document.getElementById(
+            "sourceFields"
+        );
+
+
+    source.innerHTML = "";
+
+
+    addInfoRow(
+        source,
+        "Nom CSP",
+        line.source.nomCSP
+    );
+
+    addInfoRow(
+        source,
+        "Contrat BAD",
+        line.source.contratBAD
+    );
+
+    addInfoRow(
+        source,
+        "IDT Connexion",
+        line.source.idtConnexion
+    );
+
+    addInfoRow(
+        source,
+        "N° Abonné CSP",
+        line.source.numeroAbonneCSP
+    );
+
+    addInfoRow(
+        source,
+        "IBAN Prélèvement",
+        line.source.ibanPrelevement
+    );
+
+    addInfoRow(
+        source,
+        "MDP CSP",
+        line.source.mdpCSP
+    );
+
+
+    /* LINE INFO */
+
+    const info =
+        document.getElementById(
+            "lineFields"
+        );
+
+
+    info.innerHTML = "";
+
+
+    addInfoRow(
+        info,
+        "Raison Sociale",
+        line.raisonSociale
+    );
+
+    addInfoRow(
+        info,
+        "SIRET",
+        line.siret
+    );
+
+    addInfoRow(
+        info,
+        "Type Facture",
+        line.typeFacture
+    );
+
+    addInfoRow(
+        info,
+        "Date Limite",
+        line.dateLimite
+    );
+
+}
+
+
+/* =========================================================
+   INFO ROW + COPY
+========================================================= */
+
+function addInfoRow(
+    container,
+    label,
+    value
+) {
+
+    const row =
+        document.createElement("div");
+
+
+    row.className =
+        "info-row";
+
+
+    const labelElement =
+        document.createElement("label");
+
+
+    labelElement.textContent =
+        label;
+
+
+    const valueElement =
+        document.createElement("div");
+
+
+    valueElement.className =
+        "info-value";
+
+
+    valueElement.textContent =
+        value || "-";
+
+
+    const copyButton =
+        document.createElement("button");
+
+
+    copyButton.className =
+        "copy-btn";
+
+
+    copyButton.textContent =
+        "Copier";
+
+
+    copyButton.addEventListener(
+        "click",
+        () => copyText(value)
+    );
+
+
+    row.appendChild(
+        labelElement
+    );
+
+    row.appendChild(
+        valueElement
+    );
+
+    row.appendChild(
+        copyButton
+    );
+
+
+    container.appendChild(row);
+
+}
+
+
+/* =========================================================
+   COPY
+========================================================= */
+
+function copyText(text) {
+
+    navigator.clipboard
+        .writeText(text || "")
+        .then(() => {
+
+            showToast(
+                "Information copiée."
+            );
+
+        })
+        .catch(() => {
+
+            showToast(
+                "Impossible de copier."
+            );
+
+        });
+
+}
+
+
+/* =========================================================
+   TAKE LINE
+========================================================= */
+
+function takeSelectedLine() {
+
+    if (!selectedLineId) {
+
+        showToast(
+            "Sélectionnez une ligne."
+        );
+
+        return;
+
+    }
+
+
+    const line =
+        pendingLines.find(
+            item =>
+                item.id ===
+                selectedLineId
+        );
+
+
+    if (!line) return;
+
+
+    currentTreatment = line;
+
+
+    saveData();
+
+
+    enableTreatmentInputs();
+
+
+    /*
+        We can automatically prefill
+        some information if wanted.
+    */
+
+    document
+        .getElementById(
+            "inputContrat"
+        )
+        .value =
+        line.source.contratBAD || "";
+
+
+    document
+        .getElementById(
+            "inputCSP"
+        )
+        .value =
+        line.source.nomCSP || "";
+
+
+    document
+        .getElementById(
+            "takeBtn"
+        )
+        .disabled = true;
+
+
+    renderDashboard();
+
+
+    showToast(
+        "Ligne prise en charge."
+    );
+
+}
+
+
+/* =========================================================
+   INPUT STATE
+========================================================= */
+
+function enableTreatmentInputs() {
+
+    const ids = [
+
+        "inputAbonne",
+        "inputIDT",
+        "inputMDP",
+        "inputContrat",
+        "inputCSP"
+
+    ];
+
+
+    ids.forEach(id => {
+
+        document
+            .getElementById(id)
+            .disabled = false;
+
+    });
+
+
+    document
+        .getElementById(
+            "finishBtn"
+        )
+        .disabled = false;
+
+
+    document
+        .getElementById(
+            "cancelBtn"
+        )
+        .disabled = false;
+
+}
+
+
+function disableTreatmentInputs() {
+
+    const ids = [
+
+        "inputAbonne",
+        "inputIDT",
+        "inputMDP",
+        "inputContrat",
+        "inputCSP"
+
+    ];
+
+
+    ids.forEach(id => {
+
+        const input =
+            document.getElementById(id);
+
+        input.disabled = true;
+
+        input.value = "";
+
+    });
+
+
+    document
+        .getElementById(
+            "finishBtn"
+        )
+        .disabled = true;
+
+
+    document
+        .getElementById(
+            "cancelBtn"
+        )
+        .disabled = true;
+
+}
+
+
+/* =========================================================
+   CANCEL
+========================================================= */
+
+function cancelTreatment() {
+
+    if (!currentTreatment) return;
+
+
+    currentTreatment = null;
+
+
+    saveData();
+
+
+    disableTreatmentInputs();
+
+
+    document
+        .getElementById(
+            "takeBtn"
+        )
+        .disabled = false;
+
+
+    renderDashboard();
+
+
+    showToast(
+        "Prise en charge annulée."
+    );
+
+}
+
+
+/* =========================================================
+   FINISH
+========================================================= */
+
+function finishTreatment() {
+
+    if (!currentTreatment) {
+
+        showToast(
+            "Aucun traitement en cours."
+        );
+
+        return;
+
+    }
+
+
+    const abonne =
+        document
+            .getElementById(
+                "inputAbonne"
+            )
+            .value
+            .trim();
+
+
+    const idt =
+        document
+            .getElementById(
+                "inputIDT"
+            )
+            .value
+            .trim();
+
+
+    const mdp =
+        document
+            .getElementById(
+                "inputMDP"
+            )
+            .value
+            .trim();
+
+
+    const contrat =
+        document
+            .getElementById(
+                "inputContrat"
+            )
+            .value
+            .trim();
+
+
+    const csp =
+        document
+            .getElementById(
+                "inputCSP"
+            )
+            .value
+            .trim();
+
+
+    /*
+        For V1 we require every field.
+    */
+
+    if (
+        !abonne ||
+        !idt ||
+        !mdp ||
+        !contrat ||
+        !csp
+    ) {
+
+        showToast(
+            "Veuillez compléter toutes les saisies."
+        );
+
+        return;
+
+    }
+
+
+    const completed = {
+
+        ...currentTreatment,
+
+        traitement: {
+
+            numeroAbonne: abonne,
+
+            idt: idt,
+
+            mdp: mdp,
+
+            contratBAD: contrat,
+
+            csp: csp
+
+        },
+
+        agent:
+            "HAMDANMO",
+
+        completedAt:
+            new Date()
+                .toLocaleString("fr-FR")
 
     };
 
 
-    // Add to array
-    people.push(newPerson);
-
-
-    // Save
-    savePeople();
-
-
-    // Refresh interface
-    displayPeople();
-
-
-    // Clear inputs
-    nameInput.value = "";
-
-    ageInput.value = "";
-
-
-    nameInput.focus();
-
-}
-
-
-// DELETE
-function deletePerson(index) {
-
-    people.splice(index, 1);
-
-    savePeople();
-
-    displayPeople();
-
-}
-
-
-// CLEAR EVERYTHING
-function clearPeople() {
-
-    if (people.length === 0) {
-        return;
-    }
-
-
-    const confirmation = confirm(
-        "Are you sure you want to delete everyone?"
+    completedLines.unshift(
+        completed
     );
 
 
-    if (!confirmation) {
-        return;
-    }
+    /*
+        Remove from pending.
+    */
+
+    pendingLines =
+        pendingLines.filter(
+            line =>
+                line.id !==
+                currentTreatment.id
+        );
 
 
-    people = [];
+    currentTreatment = null;
 
-    savePeople();
+    selectedLineId = null;
 
-    displayPeople();
+
+    saveData();
+
+
+    disableTreatmentInputs();
+
+
+    resetDetails();
+
+
+    renderEverything();
+
+
+    showToast(
+        "✓ Ligne traitée avec succès."
+    );
 
 }
 
 
-// BUTTON EVENTS
-addBtn.addEventListener("click", addPerson);
+/* =========================================================
+   RESET DETAILS
+========================================================= */
 
-clearBtn.addEventListener("click", clearPeople);
+function resetDetails() {
+
+    document
+        .getElementById(
+            "detailsContainer"
+        )
+        .classList.add("hidden");
 
 
-// Press ENTER to add
-nameInput.addEventListener("keydown", function(event) {
+    document
+        .getElementById(
+            "noSelection"
+        )
+        .classList.remove("hidden");
 
-    if (event.key === "Enter") {
-        addPerson();
+
+    document
+        .getElementById(
+            "takeBtn"
+        )
+        .disabled = false;
+
+}
+
+
+/* =========================================================
+   HISTORY
+========================================================= */
+
+function renderHistory() {
+
+    const table =
+        document.getElementById(
+            "historyTable"
+        );
+
+
+    const search =
+        document.getElementById(
+            "historySearch"
+        )
+        .value
+        .toLowerCase();
+
+
+    table.innerHTML = "";
+
+
+    const filtered =
+        completedLines.filter(
+            line => {
+
+                return (
+
+                    line.siret
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    line.raisonSociale
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    line.agent
+                        .toLowerCase()
+                        .includes(search)
+
+                );
+
+            }
+        );
+
+
+    filtered.forEach(line => {
+
+        table.innerHTML += `
+
+            <tr>
+
+                <td>
+                    ${line.siret}
+                </td>
+
+                <td>
+                    ${line.raisonSociale}
+                </td>
+
+                <td>
+                    ${line.typeFacture}
+                </td>
+
+                <td>
+                    ${line.traitement.numeroAbonne}
+                </td>
+
+                <td>
+                    ${line.traitement.idt}
+                </td>
+
+                <td>
+                    ${line.traitement.csp}
+                </td>
+
+                <td>
+                    ${line.agent}
+                </td>
+
+                <td>
+                    ${line.completedAt}
+                </td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    if (filtered.length === 0) {
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td colspan="8"
+                    style="
+                        text-align:center;
+                        padding:35px;
+                        color:#9ca3af;
+                    ">
+
+                    Aucun traitement trouvé.
+
+                </td>
+
+            </tr>
+
+        `;
+
     }
 
-});
+}
 
 
-ageInput.addEventListener("keydown", function(event) {
+/* =========================================================
+   TOAST
+========================================================= */
 
-    if (event.key === "Enter") {
-        addPerson();
-    }
-
-});
+let toastTimer;
 
 
-// Initial display
-displayPeople();
+function showToast(message) {
 
-Now test it
+    const toast =
+        document.getElementById(
+            "toast"
+        );
 
-Your folder should look like:
 
-PeopleList/
-│
-├── index.html
-├── style.css
-└── script.js
+    toast.textContent =
+        message;
 
-Double-click index.html.
 
-You'll initially see Amine and Yassine. Add someone, for example:
+    toast.classList.add(
+        "show"
+    );
 
-Name: Ikram
-Age: 22
 
-Click Add Person.
+    clearTimeout(
+        toastTimer
+    );
 
-Then close the webpage completely and open index.html again. Ikram should still be there. That's the important test: if she remains, localStorage is working.
 
-After you confirm that works, we can make the interface much more advanced—search, edit people, profile pictures, phone/email fields, sorting, IDs, etc.
+    toastTimer =
+        setTimeout(() => {
+
+            toast.classList.remove(
+                "show"
+            );
+
+        }, 2500);
+
+}
+
+
+/* =========================================================
+   DATE
+========================================================= */
+
+function displayCurrentDate() {
+
+    const date =
+        new Date();
+
+
+    document
+        .getElementById(
+            "currentDate"
+        )
+        .textContent =
+        date.toLocaleDateString(
+            "fr-FR",
+            {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                year: "numeric"
+            }
+        );
+
+}
+
+
+/* =========================================================
+   RESTORE ACTIVE TREATMENT
+========================================================= */
+
+function restoreTreatment() {
+
+    if (!currentTreatment)
+        return;
+
+
+    selectedLineId =
+        currentTreatment.id;
+
+
+    displayLineDetails(
+        currentTreatment
+    );
+
+
+    enableTreatmentInputs();
+
+
+    document
+        .getElementById(
+            "takeBtn"
+        )
+        .disabled = true;
+
+}
+
+
+/* =========================================================
+   RENDER EVERYTHING
+========================================================= */
+
+function renderEverything() {
+
+    renderDashboard();
+
+    renderPendingLines();
+
+    renderHistory();
+
+}
+
+
+/* =========================================================
+   START APPLICATION
+========================================================= */
+
+displayCurrentDate();
+
+renderEverything();
+
+restoreTreatment();
+
+Teste maintenant le workflow
+
+Au premier lancement tu auras 1 ligne à traiter :
+
+HAMMERSCHMIDT (Jacques) — SIRET 44193577200059.
+
+Va dans À traiter, clique sur la ligne. Les informations source apparaissent à droite sans être modifiables et chaque valeur possède Copier.
+
+Clique ensuite sur Prendre en charge. La zone Saisie / Traitement devient disponible. Renseigne N° Abonné, IDT, MDP, Contrat BAD et CSP, puis clique Terminer le traitement.
+
+La ligne disparaît de À traiter, le compteur passe à 0, et la ligne complète est transférée dans Historique avec le nom de l'agent et la date/heure.
+
+Tout est enregistré dans localStorage, donc tu peux fermer puis rouvrir la page.
+
+Important pour ton prochain message : explique-moi maintenant d'où arrivent les lignes à traiter et sous quel format — Excel, CSV, un fichier dans un dossier, etc. C'est cette partie qui va déterminer l'architecture de la prochaine étape.
