@@ -1,14 +1,509 @@
-Objet : RE: Dépliant tarifaire CIC
+Yep. Create a folder such as PeopleList, then create these 3 files inside it.
 
-Bonjour Amélie,
+index.html
 
-Après test du dépliant Particuliers Banque Privée, tout est OK concernant la mise en accessibilité du document (couleurs, typographie, etc.).
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>People Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 
-Le seul point à revoir concerne les liens hypertextes : ils doivent être suffisamment distinguables du texte environnant, notamment par un soulignement ou un autre élément visuel, afin de respecter les critères d’accessibilité.
+<body>
 
-Une fois ce point pris en compte, le document pourra être transmis pour traitement et balisage.
+<div class="container">
 
-Merci.
+    <div class="header">
+        <div>
+            <h1>People Manager</h1>
+            <p>Manage your list of people</p>
+        </div>
 
-Cordialement,
-Mohamed HAMDANI
+        <div class="counter">
+            <span id="peopleCount">0</span>
+            <small>People</small>
+        </div>
+    </div>
+
+
+    <div class="add-section">
+
+        <h2>Add a person</h2>
+
+        <div class="form">
+
+            <input
+                type="text"
+                id="name"
+                placeholder="Full name"
+            >
+
+            <input
+                type="number"
+                id="age"
+                placeholder="Age"
+                min="1"
+            >
+
+            <button id="addBtn">
+                + Add Person
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div class="list-section">
+
+        <div class="list-header">
+            <h2>People</h2>
+
+            <button id="clearBtn" class="clear-btn">
+                Clear All
+            </button>
+        </div>
+
+        <div id="peopleList"></div>
+
+        <div id="emptyMessage" class="empty">
+            No people added yet.
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="script.js"></script>
+
+</body>
+</html>
+
+style.css
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    color: #222;
+}
+
+.container {
+    width: 90%;
+    max-width: 900px;
+    margin: 50px auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    margin: 0;
+}
+
+.header p {
+    margin-top: 8px;
+    color: #777;
+}
+
+.counter {
+    background: white;
+    padding: 15px 25px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+}
+
+.counter span {
+    display: block;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.counter small {
+    color: #777;
+}
+
+.add-section,
+.list-section {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+}
+
+.add-section h2,
+.list-section h2 {
+    margin-top: 0;
+}
+
+.form {
+    display: flex;
+    gap: 10px;
+}
+
+input {
+    flex: 1;
+    padding: 13px;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    font-size: 15px;
+    outline: none;
+}
+
+input:focus {
+    border-color: #333;
+}
+
+button {
+    border: none;
+    background: #222;
+    color: white;
+    padding: 13px 20px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.clear-btn {
+    background: transparent;
+    color: #d33;
+    padding: 8px;
+}
+
+.person {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 16px;
+    margin-top: 10px;
+
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+.person-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.person-name {
+    font-weight: bold;
+}
+
+.person-age {
+    color: #777;
+    font-size: 14px;
+}
+
+.delete-btn {
+    background: #f5f5f5;
+    color: #d33;
+    padding: 8px 12px;
+}
+
+.empty {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+@media (max-width: 650px) {
+
+    .form {
+        flex-direction: column;
+    }
+
+    .header {
+        align-items: flex-start;
+    }
+
+}
+
+script.js
+
+// People that exist the FIRST time the website is opened
+const defaultPeople = [
+    {
+        name: "Amine",
+        age: 22
+    },
+    {
+        name: "Yassine",
+        age: 24
+    }
+];
+
+
+// Load saved people
+let people = JSON.parse(localStorage.getItem("people"));
+
+
+// If nothing has been saved yet,
+// use our default people
+if (!people) {
+    people = defaultPeople;
+    savePeople();
+}
+
+
+// Elements
+const nameInput = document.getElementById("name");
+const ageInput = document.getElementById("age");
+
+const addBtn = document.getElementById("addBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+const peopleList = document.getElementById("peopleList");
+const peopleCount = document.getElementById("peopleCount");
+const emptyMessage = document.getElementById("emptyMessage");
+
+
+// SAVE
+function savePeople() {
+
+    localStorage.setItem(
+        "people",
+        JSON.stringify(people)
+    );
+
+}
+
+
+// DISPLAY
+function displayPeople() {
+
+    peopleList.innerHTML = "";
+
+    peopleCount.textContent = people.length;
+
+
+    // Empty list
+    if (people.length === 0) {
+
+        emptyMessage.style.display = "block";
+
+        return;
+
+    }
+
+
+    emptyMessage.style.display = "none";
+
+
+    // Create each person
+    people.forEach((person, index) => {
+
+        const personDiv = document.createElement("div");
+
+        personDiv.className = "person";
+
+
+        personDiv.innerHTML = `
+
+            <div class="person-info">
+
+                <span class="person-name">
+                    ${person.name}
+                </span>
+
+                <span class="person-age">
+                    ${person.age} years old
+                </span>
+
+            </div>
+
+            <button
+                class="delete-btn"
+                onclick="deletePerson(${index})"
+            >
+                Delete
+            </button>
+
+        `;
+
+
+        peopleList.appendChild(personDiv);
+
+    });
+
+}
+
+
+// ADD PERSON
+function addPerson() {
+
+    const name = nameInput.value.trim();
+
+    const age = ageInput.value;
+
+
+    // Validation
+    if (name === "") {
+
+        alert("Please enter a name.");
+
+        nameInput.focus();
+
+        return;
+
+    }
+
+
+    if (age === "" || age <= 0) {
+
+        alert("Please enter a valid age.");
+
+        ageInput.focus();
+
+        return;
+
+    }
+
+
+    // Create person
+    const newPerson = {
+
+        name: name,
+
+        age: Number(age)
+
+    };
+
+
+    // Add to array
+    people.push(newPerson);
+
+
+    // Save
+    savePeople();
+
+
+    // Refresh interface
+    displayPeople();
+
+
+    // Clear inputs
+    nameInput.value = "";
+
+    ageInput.value = "";
+
+
+    nameInput.focus();
+
+}
+
+
+// DELETE
+function deletePerson(index) {
+
+    people.splice(index, 1);
+
+    savePeople();
+
+    displayPeople();
+
+}
+
+
+// CLEAR EVERYTHING
+function clearPeople() {
+
+    if (people.length === 0) {
+        return;
+    }
+
+
+    const confirmation = confirm(
+        "Are you sure you want to delete everyone?"
+    );
+
+
+    if (!confirmation) {
+        return;
+    }
+
+
+    people = [];
+
+    savePeople();
+
+    displayPeople();
+
+}
+
+
+// BUTTON EVENTS
+addBtn.addEventListener("click", addPerson);
+
+clearBtn.addEventListener("click", clearPeople);
+
+
+// Press ENTER to add
+nameInput.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter") {
+        addPerson();
+    }
+
+});
+
+
+ageInput.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter") {
+        addPerson();
+    }
+
+});
+
+
+// Initial display
+displayPeople();
+
+Now test it
+
+Your folder should look like:
+
+PeopleList/
+│
+├── index.html
+├── style.css
+└── script.js
+
+Double-click index.html.
+
+You'll initially see Amine and Yassine. Add someone, for example:
+
+Name: Ikram
+Age: 22
+
+Click Add Person.
+
+Then close the webpage completely and open index.html again. Ikram should still be there. That's the important test: if she remains, localStorage is working.
+
+After you confirm that works, we can make the interface much more advanced—search, edit people, profile pictures, phone/email fields, sorting, IDs, etc.
